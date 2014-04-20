@@ -1,49 +1,40 @@
 module Main where
 
+import Jumpie.Geometry.Point(Point(..))
+import Jumpie.Geometry.Intersection(intersection)
+import Data.Functor(fmap)
+import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
+import Jumpie.SDLHelper(createPixel,blitAtPosition,fillSurface,surfaceBresenham)
 import Control.Applicative((<$>))
-import Control.Monad(return,(>>),unless,(>>=),mapM,filterM)
+import Control.Monad(return,unless,mapM,filterM)
 import System.Directory(getDirectoryContents,doesFileExist)
 import Data.Eq(Eq)
-import Control.Arrow((&&&))
 import Data.String(String)
 import Data.Bool(Bool(..))
-import Data.Function(($),(.),id)
+import Data.Function(($),(.))
 import Data.Int(Int)
-import Data.List(elem,any,lookup,(++),zip,map)
-import Data.Tuple(snd)
-import Debug.Trace(trace)
+import Data.Word(Word8)
+import Data.List(any,lookup,(++),zip,map)
+--import Debug.Trace(trace)
 import Data.Maybe(Maybe(..))
 import Graphics.UI.SDL.Events(Event(NoEvent,Quit,KeyDown),pollEvent)
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
 import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface)
-import Graphics.UI.SDL.Video(setVideoMode,blitSurface)
+import Graphics.UI.SDL.Video(setVideoMode)
 import Graphics.UI.SDL.WindowManagement(setCaption)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
-import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error)
-import System.Clock(Clock(Monotonic),nsec,TimeSpec(..),getTime)
+import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+))
+import System.Clock(Clock(Monotonic),nsec,getTime)
 import System.FilePath
 import System.IO(IO)
-
-type Coord = Double
-
-data Point a = Point a a
-
-getX :: Point a -> a
-getX (Point x _) = x
-
-getY :: Point a -> a
-getY (Point _ y) = y
-
-type DoublePoint = Point Double
 
 newtype GameTicks = GameTicks { getTickValue :: Int }
 
 newtype Direction = Direction { getDirection :: Point Bool }
 
 data GameState = GameState {
-                 playerPosition :: DoublePoint
-               , playerMovement :: Direction
+                 playerPosition :: Point Double
                }
 
 newtype SurfaceId = SurfaceId { getSurfaceId :: String } deriving(Eq)
@@ -60,19 +51,43 @@ getImage gd sid = case lookup sid (gdSurfaces gd) of
   Nothing -> error $ "Image " ++ getSurfaceId sid ++ " not found!"
   Just im -> im
 
-data Action = PlayerLeft | PlayerRight | PlayerUp | PlayerDown
+data IncomingAction = PlayerLeft | PlayerRight | PlayerUp | PlayerDown
+data OutgoingAction = Collision
 
 initialGameState :: GameState
-initialGameState = GameState (Point (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 2.0)) (Direction $ Point False False)
+initialGameState = GameState (Point (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 2.0))
 
-processGame :: GameState -> [Action] -> GameState
+processGame :: GameState -> [IncomingAction] -> GameState
 processGame gameState actions = gameState
 
+fillScreen :: GameData -> (Word8,Word8,Word8) -> IO ()
+fillScreen gd color = fillSurface (gdScreen gd) color
+
+backgroundColor :: (Word8,Word8,Word8)
+backgroundColor = (94,129,162)
+
+drawCross :: Surface -> Point Int -> IO ()
+drawCross s p = do
+  surfaceBresenham s (255,0,0) $ LineSegment (p - (Point 5 0)) (p + (Point 5 0))
+  surfaceBresenham s (255,0,0) $ LineSegment (p - (Point 0 5)) (p + (Point 0 5))
+
+toDoubleLine :: LineSegment (Point Int) -> LineSegment (Point Double)
+toDoubleLine = fmap (fmap fromIntegral)
+
+toIntLine :: LineSegment (Point Double) -> LineSegment (Point Int)
+toIntLine = fmap (fmap floor)
+
 renderGame :: GameData -> GameState -> IO ()
-renderGame gameData gameState = do
-  blitSurface (getImage gameData (SurfaceId "fuji")) Nothing (gdScreen gameData) Nothing
-  blitSurface (getImage gameData (SurfaceId "player")) Nothing (gdScreen ) 
-  return ()
+renderGame gd gameState = do
+  fillScreen gd backgroundColor
+  blitAt gd (SurfaceId "player") (Point 30.0 30.0)
+  let firstLine = LineSegment (Point 100 100) (Point 200 100)
+  let secondLine = LineSegment (Point 100 200) (Point 200 200)
+  surfaceBresenham (gdScreen gd) (255,255,255) firstLine
+  surfaceBresenham (gdScreen gd) (255,255,255) secondLine
+  case intersection (toDoubleLine firstLine) (toDoubleLine secondLine) (1/10) of
+    Nothing -> return ()
+    Just p -> drawCross (gdScreen gd) (fmap floor p)
 
 mainLoop :: Fractional a => [Event] -> GameData -> GameState -> a -> IO GameState
 mainLoop events gameData gameState ticks = do
@@ -86,9 +101,8 @@ screenHeight = 600
 screenBpp = 32
 mediaDir = "media"
 
-blitAtPosition :: GameData -> SurfaceId -> DoublePoint -> IO ()
-blitAtPosition gd sid pos = blitSurface (getImage gd sid) Nothing destRect
-  where destRect = Just $ Rect $ x y w h
+blitAt :: GameData -> SurfaceId -> Point Double -> IO ()
+blitAt gd sid pos = blitAtPosition (getImage gd sid) (gdScreen gd) pos
 
 loadImage :: FilePath -> IO Surface
 loadImage = load . (mediaDir </>)
