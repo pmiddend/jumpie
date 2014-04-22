@@ -1,15 +1,16 @@
 module Main where
 
 import Jumpie.Geometry.Point(Point(..))
-import Jumpie.Geometry.Intersection(intersection)
+import Jumpie.Geometry.Intersection(rectIntersects)
+import Data.String(String)
+import Jumpie.Geometry.Rect(Rect(Rect),lineSegments)
 import Data.Functor(fmap)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
-import Jumpie.SDLHelper(createPixel,blitAtPosition,fillSurface,surfaceBresenham)
+import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham)
 import Control.Applicative((<$>))
-import Control.Monad(return,unless,mapM,filterM)
+import Control.Monad(return,unless,mapM,filterM,mapM_,when)
 import System.Directory(getDirectoryContents,doesFileExist)
 import Data.Eq(Eq)
-import Data.String(String)
 import Data.Bool(Bool(..))
 import Data.Function(($),(.))
 import Data.Int(Int)
@@ -27,7 +28,7 @@ import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+))
 import System.Clock(Clock(Monotonic),nsec,getTime)
 import System.FilePath
-import System.IO(IO)
+import System.IO(IO,putStrLn)
 
 newtype GameTicks = GameTicks { getTickValue :: Int }
 
@@ -58,7 +59,7 @@ initialGameState :: GameState
 initialGameState = GameState (Point (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 2.0))
 
 processGame :: GameState -> [IncomingAction] -> GameState
-processGame gameState actions = gameState
+processGame gameState _ = gameState
 
 fillScreen :: GameData -> (Word8,Word8,Word8) -> IO ()
 fillScreen gd color = fillSurface (gdScreen gd) color
@@ -78,27 +79,36 @@ toIntLine :: LineSegment (Point Double) -> LineSegment (Point Int)
 toIntLine = fmap (fmap floor)
 
 renderGame :: GameData -> GameState -> IO ()
-renderGame gd gameState = do
+renderGame gd _ = do
   fillScreen gd backgroundColor
   blitAt gd (SurfaceId "player") (Point 30.0 30.0)
+  let firstRect = Rect (Point 100.0 100.0) (Point 300.0 300.0)
+  let secondRect = Rect (Point 100.0 100.0) (Point 300.0 300.0)
+  mapM_ (surfaceBresenham (gdScreen gd) (255,0,0)) (map toIntLine $ lineSegments firstRect)
+  mapM_ (surfaceBresenham (gdScreen gd) (255,0,255)) (map toIntLine $ lineSegments secondRect)
+  when (rectIntersects 0.1 firstRect secondRect) (putStrLn "AJAJAJAJAJAJ")
+  {-
   let firstLine = LineSegment (Point 100 100) (Point 200 100)
   let secondLine = LineSegment (Point 100 200) (Point 200 200)
   surfaceBresenham (gdScreen gd) (255,255,255) firstLine
   surfaceBresenham (gdScreen gd) (255,255,255) secondLine
-  case intersection (toDoubleLine firstLine) (toDoubleLine secondLine) (1/10) of
+  case lineSegmentIntersection (1/10) (toDoubleLine firstLine) (toDoubleLine secondLine) of
     Nothing -> return ()
     Just p -> drawCross (gdScreen gd) (fmap floor p)
+  -}
 
 mainLoop :: Fractional a => [Event] -> GameData -> GameState -> a -> IO GameState
-mainLoop events gameData gameState ticks = do
+mainLoop _ gameData gameState _ = do
   let newGameState = processGame gameState []
   renderGame gameData newGameState
   return newGameState
 
 -- Umgebungsvariablen
+screenWidth,screenHeight,screenBpp :: Int
 screenWidth = 800
 screenHeight = 600
 screenBpp = 32
+mediaDir :: String
 mediaDir = "media"
 
 blitAt :: GameData -> SurfaceId -> Point Double -> IO ()

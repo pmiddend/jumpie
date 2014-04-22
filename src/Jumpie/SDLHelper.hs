@@ -2,7 +2,6 @@ module Jumpie.SDLHelper(putPixel32,createPixel,surfaceBresenham,fillSurface,blit
 
 import Jumpie.Geometry.Point(Point,getY,getX)
 import Jumpie.Geometry.LineSegment(LineSegment)
-import Jumpie.Geometry.Intersection(intersection)
 import Prelude((+),(*),RealFrac,floor)
 import Graphics.UI.SDL.Rect(Rect(..))
 import Graphics.UI.SDL.Types(Surface,surfaceGetPixelFormat,surfaceGetPixels,surfaceGetWidth)

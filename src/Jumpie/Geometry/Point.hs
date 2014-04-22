@@ -1,21 +1,22 @@
-module Jumpie.Geometry.Point(Point(Point),getX,getY,cross,scalar,vmult,fromTuple,toTuple) where
+module Jumpie.Geometry.Point(Point(Point),getX,getY,cross,scalar,vmult,fromTuple,toTuple,toList) where
 
 import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger)
 import Data.Functor(fmap,Functor)
+import Control.Applicative(Applicative,(<*>),pure,liftA2)
 
 data Point a = Point { getX :: a, getY :: a }
-
--- Hilfsfunktion fuer Num unten
-biOnComponent :: (a -> a -> a) -> Point a -> Point a -> Point a
-biOnComponent f (Point a1 b1) (Point a2 b2) = Point (f a1 a2) (f b1 b2)
 
 instance Functor Point where
   fmap f (Point a b) = Point (f a) (f b)
 
+instance Applicative Point where
+  pure s = Point s s
+  pf <*> pa = Point ((getX pf) (getX pa)) ((getY pf) (getY pa))
+
 instance Num a => Num (Point a) where
-  (+) = biOnComponent (+)
-  (*) = biOnComponent (*)
-  (-) = biOnComponent (-)
+  (+) = liftA2 (+)
+  (*) = liftA2 (*)
+  (-) = liftA2 (-)
   negate = fmap negate
   abs = fmap abs
   signum = fmap signum
@@ -35,3 +36,6 @@ toTuple (Point x y) = (x,y)
 
 fromTuple :: (a,a) -> Point a
 fromTuple (a,b) = Point a b
+
+toList :: Point a -> [a]
+toList (Point a b) = [a,b]
