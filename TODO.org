@@ -9,6 +9,17 @@
       - [X] Kollision zwischen zwei Rechtecken. Beide mit entsprechend
         grossen Sprites einzeichnen. Kollision im Zentrum des einen
         Rechtecks visualisieren
+* Geometriepaket
+
+  - Die Geometriefunktionen sollten _zumindest_ auf die Dimension
+    verallgemeinern (nicht nur zweidimensionale Punkte annehmen)
+  - Daher Definition einer Typklasse =VectorSpace=
+    - mit einem Parameter =a= fuer den skalaren Typ.
+    - Multiplikation mit einem Skalar
+    - zusaetzlich Operationen +, inverse und darauf aufbauend -
+  - Zusaetzliche Typklasse =Listable= mit Methode =toList=, falls man
+    doch noch auf Listen zurueckgehen muss.
+
 * Sonicphysik
 ** Gesetze
 

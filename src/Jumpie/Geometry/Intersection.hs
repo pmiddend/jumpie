@@ -12,6 +12,9 @@ import Jumpie.Geometry.Rect(Rect,inside,lineSegments)
 import Control.Applicative((<$>),(<*>))
 import Data.Composition((.:))
 
+lineSegmentIntersects :: (Num a,Fractional a,Ord a) => a -> LineSegment (Point a) -> LineSegment (Point a) -> Bool
+lineSegmentIntersects = isJust . lineSegmentIntersection
+
 -- Kleiner Hinweis: hier ist fast gar kein (Point a) explizit noetig, aber man brauch vmult, scalar und cross.
 -- Vielleicht kann man das in 'ne Typklasse auslagern?
 lineSegmentIntersection :: (Num a,Fractional a,Ord a) => a -> LineSegment (Point a) -> LineSegment (Point a) -> Maybe (Point a)

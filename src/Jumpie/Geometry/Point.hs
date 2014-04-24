@@ -25,8 +25,8 @@ instance Num a => Num (Point a) where
 cross :: Num a => Point a -> Point a -> a
 cross (Point x1 y1) (Point x2 y2) = x1 * y2 - y1 * x2
 
-scalar :: Num a => Point a -> Point a -> a
-scalar (Point x1 y1) (Point x2 y2) = x1 * x2 + y1 * y2
+dot :: Num a => Point a -> Point a -> a
+dot (Point x1 y1) (Point x2 y2) = x1 * x2 + y1 * y2
 
 vmult :: Num a => a -> Point a -> Point a
 vmult s p = fmap (s *) p
