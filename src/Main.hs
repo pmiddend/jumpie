@@ -1,65 +1,127 @@
 module Main where
 
-import Jumpie.Geometry.Point(Point(..))
-import Jumpie.Geometry.Intersection(rectIntersects)
-import Data.String(String)
-import Jumpie.Geometry.Rect(Rect(Rect),lineSegments)
-import Data.Functor(fmap)
-import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
-import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham)
-import Control.Applicative((<$>))
-import Control.Monad(return,unless,mapM,filterM,mapM_,when)
-import System.Directory(getDirectoryContents,doesFileExist)
-import Data.Eq(Eq)
+import Control.Applicative((<$>),(*>))
+import Control.Monad(return,unless,mapM,filterM)
 import Data.Bool(Bool(..))
+import Data.Eq(Eq)
+import Data.Foldable(traverse_)
 import Data.Function(($),(.))
+import Data.Functor(fmap)
 import Data.Int(Int)
-import Data.Word(Word8)
-import Data.List(any,lookup,(++),zip,map)
---import Debug.Trace(trace)
+import Data.List(any,lookup,(++),zip,map,concatMap)
 import Data.Maybe(Maybe(..))
-import Graphics.UI.SDL.Events(Event(NoEvent,Quit,KeyDown),pollEvent)
+import Data.String(String)
+import Data.Tuple(fst,snd)
+import Data.Word(Word8)
+--import Debug.Trace(trace)
+import Graphics.UI.SDL.Events(Event(Quit,KeyDown))
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
-import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface)
+import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface,surfaceGetWidth,surfaceGetHeight)
 import Graphics.UI.SDL.Video(setVideoMode)
 import Graphics.UI.SDL.WindowManagement(setCaption)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
-import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+))
+import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
+import Jumpie.Geometry.Point(Point2(..))
+import Jumpie.Geometry.Rect(Rect(Rect),topLeft,bottomRight,dimensions)
+import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham,pollEvents)
+import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral)
 import System.Clock(Clock(Monotonic),nsec,getTime)
+import System.Directory(getDirectoryContents,doesFileExist)
 import System.FilePath
-import System.IO(IO,putStrLn)
+import System.IO(IO)
 
-newtype GameTicks = GameTicks { getTickValue :: Int }
+-- Enginetypen Anfang
+newtype GameTicks = GameTicks { tickValue :: Int }
 
-newtype Direction = Direction { getDirection :: Point Bool }
+newtype SurfaceId = SurfaceId { surfaceId :: String } deriving(Eq)
 
-data GameState = GameState {
-                 playerPosition :: Point Double
-               }
+type RectInt = Rect (Point2 Int)
 
-newtype SurfaceId = SurfaceId { getSurfaceId :: String } deriving(Eq)
+type SurfaceData = (Surface,RectInt)
 
-type SurfaceMap = [(SurfaceId,Surface)]
+type SurfaceMap = [(SurfaceId,SurfaceData)]
 
 data GameData = GameData {
                 gdSurfaces :: SurfaceMap,
                 gdScreen :: Surface
               }
 
-getImage :: GameData -> SurfaceId -> Surface
-getImage gd sid = case lookup sid (gdSurfaces gd) of
-  Nothing -> error $ "Image " ++ getSurfaceId sid ++ " not found!"
-  Just im -> im
+type PointReal = Point2 Double
+type RectReal = Rect PointReal
+-- Enginetypen Ende
+
+-- Spieltypen Anfang
+data PlayerMode = Ground | Air
+
+-- Objekte
+newtype SensorLine = SensorLine { line :: LineSegment PointReal }
+newtype Box = Box { box :: RectReal }
+
+data Player = Player {
+  playerPosition :: PointReal,
+  playerMode :: PlayerMode
+  }
+
+data GameObject = ObjectPlayer Player | ObjectBox Box | ObjectSensorLine SensorLine
+
+type GameState = [GameObject]
 
 data IncomingAction = PlayerLeft | PlayerRight | PlayerUp | PlayerDown
 data OutgoingAction = Collision
+-- Spieltypen Ende
 
-initialGameState :: GameState
-initialGameState = GameState (Point (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 2.0))
+-- Umgebungsvariablen Anfang
+screenWidth,screenHeight,screenBpp :: Int
+screenWidth = 800
+screenHeight = 600
+screenBpp = 32
+mediaDir :: String
+mediaDir = "media"
+-- Umgebungsvariablen Ende
+
+getImageData :: GameData -> SurfaceId -> SurfaceData
+getImageData gd sid = case lookup sid (gdSurfaces gd) of
+  Nothing -> error $ "Image " ++ surfaceId sid ++ " not found!"
+  Just im -> im
+
+getImage :: GameData -> SurfaceId -> Surface
+-- TODO: .:. hier?
+getImage gd sid = fst $ getImageData gd sid
+
+getImageRect :: GameData -> SurfaceId -> RectInt
+getImageRect gd sid = snd $ getImageData gd sid
+
+initialPlayer :: Player
+initialPlayer = Player {
+  playerPosition = Point2 (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 4.0),
+  playerMode = Ground
+  }
+
+initialBoxes :: [Box]
+initialBoxes = map toBox [0..boxesPerScreen+1]
+  where rectSize = 35
+        height = fromIntegral $ screenHeight `div` 2 - rectSize `div` 2
+        boxesPerScreen = screenWidth `div` rectSize
+        toBox xRaw = Box $ Rect {
+          topLeft = Point2 (fromIntegral (xRaw*rectSize)) height,
+          bottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (height + fromIntegral rectSize)
+          }
+
+initialGameState :: [GameObject]
+initialGameState = ObjectPlayer initialPlayer : (ObjectBox <$> initialBoxes)
 
 processGame :: GameState -> [IncomingAction] -> GameState
-processGame gameState _ = gameState
+processGame gameObjects actions = concatMap (processGameObject gameObjects actions) gameObjects
+
+processGameObject :: [GameObject] -> [IncomingAction] -> GameObject -> [GameObject]
+processGameObject os ias o = case o of
+  ObjectPlayer p -> processPlayerObject os ias p
+  ObjectBox b -> [ObjectBox b]
+  ObjectSensorLine _ -> []
+
+processPlayerObject :: [GameObject] -> [IncomingAction] -> Player -> [GameObject]
+processPlayerObject os ias p = [ObjectPlayer p]
 
 fillScreen :: GameData -> (Word8,Word8,Word8) -> IO ()
 fillScreen gd color = fillSurface (gdScreen gd) color
@@ -67,35 +129,29 @@ fillScreen gd color = fillSurface (gdScreen gd) color
 backgroundColor :: (Word8,Word8,Word8)
 backgroundColor = (94,129,162)
 
-drawCross :: Surface -> Point Int -> IO ()
+drawCross :: Surface -> Point2 Int -> IO ()
 drawCross s p = do
-  surfaceBresenham s (255,0,0) $ LineSegment (p - (Point 5 0)) (p + (Point 5 0))
-  surfaceBresenham s (255,0,0) $ LineSegment (p - (Point 0 5)) (p + (Point 0 5))
+  surfaceBresenham s (255,0,0) $ LineSegment (p - (Point2 5 0)) (p + (Point2 5 0))
+  surfaceBresenham s (255,0,0) $ LineSegment (p - (Point2 0 5)) (p + (Point2 0 5))
 
-toDoubleLine :: LineSegment (Point Int) -> LineSegment (Point Double)
+toDoubleLine :: LineSegment (Point2 Int) -> LineSegment (PointReal)
 toDoubleLine = fmap (fmap fromIntegral)
 
-toIntLine :: LineSegment (Point Double) -> LineSegment (Point Int)
+toIntLine :: LineSegment (PointReal) -> LineSegment (Point2 Int)
 toIntLine = fmap (fmap floor)
 
+toPointReal :: Integral a => Point2 a -> PointReal
+toPointReal p = fromIntegral <$> p
+
 renderGame :: GameData -> GameState -> IO ()
-renderGame gd _ = do
-  fillScreen gd backgroundColor
-  blitAt gd (SurfaceId "player") (Point 30.0 30.0)
-  let firstRect = Rect (Point 100.0 100.0) (Point 300.0 300.0)
-  let secondRect = Rect (Point 100.0 100.0) (Point 300.0 300.0)
-  mapM_ (surfaceBresenham (gdScreen gd) (255,0,0)) (map toIntLine $ lineSegments firstRect)
-  mapM_ (surfaceBresenham (gdScreen gd) (255,0,255)) (map toIntLine $ lineSegments secondRect)
-  when (rectIntersects 0.1 firstRect secondRect) (putStrLn "AJAJAJAJAJAJ")
-  {-
-  let firstLine = LineSegment (Point 100 100) (Point 200 100)
-  let secondLine = LineSegment (Point 100 200) (Point 200 200)
-  surfaceBresenham (gdScreen gd) (255,255,255) firstLine
-  surfaceBresenham (gdScreen gd) (255,255,255) secondLine
-  case lineSegmentIntersection (1/10) (toDoubleLine firstLine) (toDoubleLine secondLine) of
-    Nothing -> return ()
-    Just p -> drawCross (gdScreen gd) (fmap floor p)
-  -}
+renderGame gd go = fillScreen gd backgroundColor *> traverse_ (renderObject gd) go
+
+renderObject :: GameData -> GameObject -> IO ()
+renderObject gd ob = case ob of
+  ObjectPlayer p -> blitAt gd playerImage ((playerPosition p) - (toPointReal $ dimensions playerRect))
+  ObjectSensorLine (SensorLine s) -> surfaceBresenham (gdScreen gd) (255,0,0) (toIntLine s)
+  ObjectBox (Box b) -> blitAt gd (getImage gd (SurfaceId "platform")) (topLeft b)
+  where (playerImage,playerRect) = getImageData gd (SurfaceId "player")
 
 mainLoop :: Fractional a => [Event] -> GameData -> GameState -> a -> IO GameState
 mainLoop _ gameData gameState _ = do
@@ -103,29 +159,11 @@ mainLoop _ gameData gameState _ = do
   renderGame gameData newGameState
   return newGameState
 
--- Umgebungsvariablen
-screenWidth,screenHeight,screenBpp :: Int
-screenWidth = 800
-screenHeight = 600
-screenBpp = 32
-mediaDir :: String
-mediaDir = "media"
-
-blitAt :: GameData -> SurfaceId -> Point Double -> IO ()
-blitAt gd sid pos = blitAtPosition (getImage gd sid) (gdScreen gd) pos
+blitAt :: GameData -> Surface -> PointReal -> IO ()
+blitAt gd s pos = blitAtPosition s (gdScreen gd) pos
 
 loadImage :: FilePath -> IO Surface
 loadImage = load . (mediaDir </>)
-
--- Wrapper um das etwas eklige pollEvent
-pollEvents :: IO [Event]
-pollEvents = do
-  event <- pollEvent
-  case event of
-    NoEvent -> return []
-    _ -> do
-      events <- pollEvents
-      return $ event : events
 
 outerMainLoop :: GameData -> GameState -> GameTicks -> IO ()
 outerMainLoop gameData gameState oldTicks = do
@@ -133,7 +171,7 @@ outerMainLoop gameData gameState oldTicks = do
   newTicks <- getTicks
   unless
     (outerGameOver events) $ do
-      let tickDiff = fromIntegral (getTickValue newTicks - getTickValue oldTicks) / 1000.0
+      let tickDiff = fromIntegral (tickValue newTicks - tickValue oldTicks) / 1000.0 :: Double
       newGameState <- mainLoop events gameData gameState tickDiff
       flip (gdScreen gameData)
       outerMainLoop gameData newGameState newTicks
@@ -148,12 +186,13 @@ outerGameOver events = any outerGameOver' events
 getTicks :: IO GameTicks
 getTicks = GameTicks . nsec <$> getTime Monotonic
 
-loadImages :: IO [(SurfaceId,Surface)]
+loadImages :: IO SurfaceMap
 loadImages = do
   unfilteredContents <- getDirectoryContents mediaDir
   filteredContents <- filterM (doesFileExist . (mediaDir </>)) unfilteredContents
   ioImages <- mapM loadImage filteredContents
-  return $ zip (map (SurfaceId . dropExtension) filteredContents) ioImages
+  let ioImageSizes = map (\im -> Rect (Point2 0 0) (Point2 (surfaceGetWidth im) (surfaceGetHeight im))) ioImages
+  return $ zip ((SurfaceId . dropExtension) <$> filteredContents) (zip ioImages ioImageSizes)
 
 main :: IO ()
 main = withInit [InitEverything] $ do

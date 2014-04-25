@@ -1,41 +1,50 @@
-module Jumpie.Geometry.Point(Point(Point),getX,getY,cross,scalar,vmult,fromTuple,toTuple,toList) where
+module Jumpie.Geometry.Point(
+  Point2(Point2),
+  _x,
+  _y,
+  cross,
+  dot,
+  vmult,
+  fromTuple,
+  toTuple,
+  toList) where
 
 import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger)
 import Data.Functor(fmap,Functor)
 import Control.Applicative(Applicative,(<*>),pure,liftA2)
 
-data Point a = Point { getX :: a, getY :: a }
+data Point2 a = Point2 { _x :: a, _y :: a }
 
-instance Functor Point where
-  fmap f (Point a b) = Point (f a) (f b)
+instance Functor Point2 where
+  fmap f (Point2 a b) = Point2 (f a) (f b)
 
-instance Applicative Point where
-  pure s = Point s s
-  pf <*> pa = Point ((getX pf) (getX pa)) ((getY pf) (getY pa))
+instance Applicative Point2 where
+  pure s = Point2 s s
+  pf <*> pa = Point2 ((_x pf) (_x pa)) ((_y pf) (_y pa))
 
-instance Num a => Num (Point a) where
+instance Num a => Num (Point2 a) where
   (+) = liftA2 (+)
   (*) = liftA2 (*)
   (-) = liftA2 (-)
   negate = fmap negate
   abs = fmap abs
   signum = fmap signum
-  fromInteger i = Point (fromInteger i) (fromInteger i)
+  fromInteger i = Point2 (fromInteger i) (fromInteger i)
 
-cross :: Num a => Point a -> Point a -> a
-cross (Point x1 y1) (Point x2 y2) = x1 * y2 - y1 * x2
+cross :: Num a => Point2 a -> Point2 a -> a
+cross (Point2 x1 y1) (Point2 x2 y2) = x1 * y2 - y1 * x2
 
-dot :: Num a => Point a -> Point a -> a
-dot (Point x1 y1) (Point x2 y2) = x1 * x2 + y1 * y2
+dot :: Num a => Point2 a -> Point2 a -> a
+dot (Point2 x1 y1) (Point2 x2 y2) = x1 * x2 + y1 * y2
 
-vmult :: Num a => a -> Point a -> Point a
+vmult :: Num a => a -> Point2 a -> Point2 a
 vmult s p = fmap (s *) p
 
-toTuple :: Point a -> (a,a)
-toTuple (Point x y) = (x,y)
+toTuple :: Point2 a -> (a,a)
+toTuple (Point2 x y) = (x,y)
 
-fromTuple :: (a,a) -> Point a
-fromTuple (a,b) = Point a b
+fromTuple :: (a,a) -> Point2 a
+fromTuple (a,b) = Point2 a b
 
-toList :: Point a -> [a]
-toList (Point a b) = [a,b]
+toList :: Point2 a -> [a]
+toList (Point2 a b) = [a,b]

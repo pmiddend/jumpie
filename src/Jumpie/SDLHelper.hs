@@ -1,6 +1,13 @@
-module Jumpie.SDLHelper(putPixel32,createPixel,surfaceBresenham,fillSurface,blitAtPosition) where
+module Jumpie.SDLHelper(
+  putPixel32,
+  createPixel,
+  surfaceBresenham,
+  fillSurface,
+  blitAtPosition,
+  pollEvents) where
 
-import Jumpie.Geometry.Point(Point,getY,getX)
+import Graphics.UI.SDL.Events(Event(NoEvent),pollEvent)
+import Jumpie.Geometry.Point(Point2,_y,_x)
 import Jumpie.Geometry.LineSegment(LineSegment)
 import Prelude((+),(*),RealFrac,floor)
 import Graphics.UI.SDL.Rect(Rect(..))
@@ -21,12 +28,12 @@ import Jumpie.Bresenham(bresenham)
 createPixel :: Surface -> (Word8,Word8,Word8) -> IO Pixel
 createPixel s (r,g,b) = mapRGB (surfaceGetPixelFormat s) r g b
 
-putPixel32 :: Point Int -> Pixel -> Surface -> IO ()
+putPixel32 :: Point2 Int -> Pixel -> Surface -> IO ()
 putPixel32 p (Pixel pixel) s = do
   pixels <- castPtr <$> surfaceGetPixels s
-  pokeElemOff pixels (((getY p) * surfaceGetWidth s) + (getX p)) pixel
+  pokeElemOff pixels (((_y p) * surfaceGetWidth s) + (_x p)) pixel
 
-surfaceBresenham :: Surface -> (Word8,Word8,Word8) -> LineSegment (Point Int) -> IO ()
+surfaceBresenham :: Surface -> (Word8,Word8,Word8) -> LineSegment (Point2 Int) -> IO ()
 surfaceBresenham s rawColor line = do
   _ <- lockSurface s
   color <- createPixel s rawColor
@@ -43,9 +50,19 @@ fillSurface screen color = do
   _ <- fillRect screen (Just cr) pixel
   return ()
 
-blitAtPosition :: RealFrac a => Surface -> Surface -> Point a -> IO ()
+blitAtPosition :: RealFrac a => Surface -> Surface -> Point2 a -> IO ()
 blitAtPosition sourceSurface destSurface pos = do
   clipRect <- getClipRect sourceSurface
-  let destRect = Rect (floor (getX pos)) (floor (getY pos)) (rectW clipRect) (rectH clipRect)
+  let destRect = Rect (floor (_x pos)) (floor (_y pos)) (rectW clipRect) (rectH clipRect)
   _ <- blitSurface sourceSurface Nothing destSurface (Just destRect)
   return ()
+
+-- Wrapper um das etwas eklige pollEvent
+pollEvents :: IO [Event]
+pollEvents = do
+  event <- pollEvent
+  case event of
+    NoEvent -> return []
+    _ -> do
+      events <- pollEvents
+      return $ event : events
