@@ -1,18 +1,21 @@
 module Jumpie.Geometry.Intersection(
   rectIntersects,
-  lineSegmentIntersection,
   rectLineSegmentIntersects,
+  rectLineSegmentIntersection,
   pointInsideRect,
-  lineSegmentIntersects
+  lineSegmentIntersects,
+  lineSegmentIntersection,
+  lineSegmentInsideRect
   ) where
 
 import Control.Applicative((<$>),(<*>),pure)
+import Jumpie.Maybe(headOrNothing)
 import Data.Bool((&&),(||),not,otherwise,Bool)
 import Data.Composition((.:))
 import Data.Function((.),($))
 import Data.List(or,map,zip,zipWith,and,or)
 import Data.Maybe(Maybe(..),isJust)
-import Data.Ord((<=),(>=),(>),Ord)
+import Data.Ord((<=),(>=),(>),(<),Ord)
 import Jumpie.Geometry.LineSegment(LineSegment(..),pointList)
 import Jumpie.Geometry.Point(Point2,vmult,cross,dot,toList)
 import Jumpie.Geometry.Rect(Rect,inside,lineSegments,topLeft,bottomRight)
@@ -45,7 +48,16 @@ rectIntersects delta a b = a `inside` b || b `inside` a || or (isJust .: lineSeg
 pointInsideRect :: Ord a => Rect (Point2 a) -> Point2 a -> Bool
 pointInsideRect r p = and $ zipWith between (zip (toList . topLeft $ r) (toList . bottomRight $ r)) (toList p)
   where between :: Ord a => (a,a) -> a -> Bool
-        between (left,right) a = a >= left && a <= right
+        between (left,right) a = a >= left && a < right
 
+rectLineSegmentIntersection :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> LineSegment (Point2 a) -> Maybe (Point2 a)
+rectLineSegmentIntersection delta rect line = headOrNothing (pure (lineSegmentIntersection delta line) <*> lineSegments rect)
+
+-- Vorsicht: das ist nicht direkt rectLineSegmentIntersection.
+-- Diese Funktion enthaelt auch den Fall, dass die Linie
+-- komplett im Rect ist.
 rectLineSegmentIntersects :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> LineSegment (Point2 a) -> Bool
-rectLineSegmentIntersects delta rect line = or (pure (lineSegmentIntersects delta line) <*> lineSegments rect) || and (map (pointInsideRect rect) (pointList line))
+rectLineSegmentIntersects delta rect line = or (pure (lineSegmentIntersects delta line) <*> lineSegments rect) || lineSegmentInsideRect line rect
+
+lineSegmentInsideRect :: Ord a => LineSegment (Point2 a) -> Rect (Point2 a) -> Bool
+lineSegmentInsideRect line r = and (map (pointInsideRect r) (pointList line))

@@ -12,8 +12,9 @@ module Jumpie.Geometry.Point(
 import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger)
 import Data.Functor(fmap,Functor)
 import Control.Applicative(Applicative,(<*>),pure,liftA2)
+import Text.Show(Show)
 
-data Point2 a = Point2 { _x :: a, _y :: a }
+data Point2 a = Point2 { _x :: a, _y :: a } deriving(Show)
 
 instance Functor Point2 where
   fmap f (Point2 a b) = Point2 (f a) (f b)
