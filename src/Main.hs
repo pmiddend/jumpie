@@ -1,8 +1,10 @@
 module Main where
 
 import Control.Applicative((<$>),(*>),(<|>))
-import Data.Ord((<),(<=),(>=))
+import Jumpie.Maybe(ifMaybe)
+import Data.Ord((<),(<=),(>=),(>))
 import Control.Monad(return,unless,mapM,filterM,join)
+import Data.Monoid(First(First),getFirst,mconcat)
 import Data.Bool(Bool(..),(&&))
 import Data.Word(Word64)
 import Data.Eq(Eq)
@@ -25,9 +27,9 @@ import Graphics.UI.SDL.Video(setVideoMode)
 import Graphics.UI.SDL.WindowManagement(setCaption)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
-import Jumpie.Geometry.Intersection(rectLineSegmentIntersection)
+import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
 import Jumpie.Geometry.Point(Point2(..),vmult)
-import Jumpie.Geometry.Rect(Rect(Rect),topLeft,bottomRight,dimensions)
+import Jumpie.Geometry.Rect(Rect(Rect),topLeft,bottomRight,dimensions,top,center,right,left)
 import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham,pollEvents)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral)
 import System.Clock(Clock(Monotonic),sec,nsec,getTime,TimeSpec(TimeSpec))
@@ -58,6 +60,7 @@ data GameData = GameData {
 type Real = Double
 type PointReal = Point2 Real
 type RectReal = Rect PointReal
+type LineSegmentReal = LineSegment PointReal
 -- Enginetypen Ende
 
 -- Spieltypen Anfang
@@ -68,7 +71,7 @@ newtype Box = Box { box :: RectReal }
 newtype TimeDelta = TimeDelta { timeDelta :: Double }
 
 -- Spieler
-data PlayerMode = Ground | Air
+data PlayerMode = Ground | Air deriving(Eq)
 
 data Player = Player {
   playerPosition :: PointReal,
@@ -138,11 +141,11 @@ initialPlayer = Player {
 initialBoxes :: [Box]
 initialBoxes = map toBox [0..boxesPerScreen-1]
   where rectSize = 35
-        height = fromIntegral $ screenHeight `div` 2 - rectSize `div` 2
+        y = fromIntegral $ screenHeight `div` 2 - rectSize `div` 2
         boxesPerScreen = screenWidth `div` rectSize
         toBox xRaw = Box $ Rect {
-          topLeft = Point2 (fromIntegral (xRaw*rectSize)) height,
-          bottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (height + fromIntegral rectSize)
+          topLeft = Point2 (fromIntegral (xRaw*rectSize)) y,
+          bottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (y + fromIntegral rectSize)
           }
 
 initialGameState :: [GameObject]
@@ -162,42 +165,57 @@ processPlayerObject t os ias p = case playerMode p of
   Ground -> processGroundPlayerObject t os ias p
   Air -> processAirPlayerObject t os ias p
 
-lineCollision :: [GameObject] -> LineSegment (Point2 Double) -> Maybe (Point2 Real)
-lineCollision boxes l = join $ find isJust collisions
-  where collisions :: [Maybe (Point2 Real)]
-        collisions = map (\(ObjectBox b) -> rectLineSegmentIntersection 0.01 (box b) l) boxes
+-- Testet, ob ein LineSegment (ein Sensor) mit der Umgebung kollidiert
+lineCollision :: [GameObject] -> LineSegmentReal -> Maybe GameObject
+lineCollision boxes l = (getFirst . mconcat . map (First . (collides l))) boxes
+  where collides :: LineSegmentReal -> GameObject -> Maybe GameObject
+        collides l1 bp@(ObjectBox b) = ifMaybe (rectLineSegmentIntersects 0.01 (box b) l1) bp
+
+data Sensors = Sensors {
+  getW :: LineSegment PointReal,
+  getFL :: LineSegment PointReal,
+  getFR :: LineSegment PointReal,
+  getWCollision :: Maybe GameObject,
+  getFLCollision :: Maybe GameObject,
+  getFRCollision :: Maybe GameObject
+  }
+
+applySensors :: [GameObject] -> PointReal -> Real -> Sensors
+applySensors go p wSDev = Sensors wS fSL fSR wSCollision fSLCollision fSRCollision
+  where boxes = filter isBox go
+        wSCollision = lineCollision boxes wS
+        wS = LineSegment (Point2 wSL wSY) (Point2 wSR wSY)
+        wSY = _y p + wSDev
+        wSL = _x p - gcWSSize
+        wSR = _x p + gcWSSize
+        fSLX = _x p - 9.0
+        fSRX = _x p + 9.0
+        fSYTop = _y p + gcPlayerHeight
+        fSYBottom = _y p + gcPlayerHeight + 16.0
+        fSL = LineSegment (Point2 fSLX fSYTop) (Point2 fSLX fSYBottom)
+        fSR = LineSegment (Point2 fSRX fSYTop) (Point2 fSRX fSYBottom)
+        fSLCollision = lineCollision boxes fSL
+        fSRCollision = lineCollision boxes fSR
 
 processGroundPlayerObject :: TimeDelta -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
 processGroundPlayerObject t os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map ObjectSensorLine [SensorLine wS,SensorLine fSL,SensorLine fSR]
-        wS = LineSegment (Point2 wSL wSY) (Point2 wSR wSY)
-        wSY = (_y . playerPosition) p + 4.0
-        wSL = (_x . playerPosition) p - gcWSSize
-        wSR = (_x . playerPosition) p + gcWSSize
-        fsLX = (_x . playerPosition) p - 9.0
-        fsRX = (_x . playerPosition) p + 9.0
-        fsYTop = (_y . playerPosition) p + gcPlayerHeight
-        fsYBottom = (_y . playerPosition) p + gcPlayerHeight + 16.0
-        fSL = LineSegment (Point2 fsLX fsYTop) (Point2 fsLX fsYBottom)
-        fSR = LineSegment (Point2 fsRX fsYTop) (Point2 fsRX fsYBottom)
-        boxes = filter isBox os
-        fsCollision = (lineCollision boxes fSL) <|> (lineCollision boxes fSR)
-        notGrounded = isNothing fsCollision
-        newPlayerMode = if notGrounded
+  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors]
+        sensors = applySensors os (playerPosition p) 4.0
+        fCollision = getFLCollision sensors <|> getFRCollision sensors
+        newPlayerMode = if isNothing fCollision
                         then Air
                         else Ground
-        wSCollision = lineCollision boxes wS
-        newPlayerPositionX = case wSCollision of
-          Just (Point2 wsCx wsCy) -> if wsCx < (_x . playerPosition) p
-                                     then wsCx + 11
-                                     else wsCx - 11
+        newPlayerPositionX = case getWCollision sensors of
+          Just (ObjectBox (Box r)) -> if (_x . center) r < (_x . playerPosition) p
+                                     then (right r) + gcWSSize + 1.0
+                                     else (left r) - (gcWSSize + 1.0)
           Nothing -> (_x . playerPosition) p + timeDelta t * (_x . playerVelocity) p
-        newPlayerPositionY = case fsCollision of
-          Just (Point2 fsCx fsCy) -> fsCy - 20.0
-          Nothing -> (_y . playerPosition) p + timeDelta t * (_y . playerVelocity) p
-        newPlayerVelocity = if isJust wSCollision
+        newPlayerPositionY = case fCollision of
+          Just (ObjectBox (Box r)) -> top r - gcPlayerHeight
+          Nothing -> (_y . playerPosition) p
+        newPlayerVelocity = if isJust (getWCollision sensors)
                             then Point2 0.0 0.0
-                            else playerVelocity p
+                            else Point2 0.0 0.0
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
@@ -206,44 +224,31 @@ processGroundPlayerObject t os ias p = [ObjectPlayer np] ++ sensorLines
 
 processAirPlayerObject :: TimeDelta -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
 processAirPlayerObject t os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map ObjectSensorLine [SensorLine wS,SensorLine fSL,SensorLine fSR]
-        wS = LineSegment (Point2 wSL wSY) (Point2 wSR wSY)
-        wSY = (_y . playerPosition) p
-        wSL = (_x . playerPosition) p - gcWSSize
-        wSR = (_x . playerPosition) p + gcWSSize
-        fsLX = (_x . playerPosition) p - 9.0
-        fsRX = (_x . playerPosition) p + 9.0
-        fsYTop = (_y . playerPosition) p + gcPlayerHeight
-        fsYBottom = (_y . playerPosition) p + gcPlayerHeight + 16.0
-        fSL = LineSegment (Point2 fsLX fsYTop) (Point2 fsLX fsYBottom)
-        fSR = LineSegment (Point2 fsRX fsYTop) (Point2 fsRX fsYBottom)
-        boxes = filter isBox os
-        fsCollision = (lineCollision boxes fSL) <|> (lineCollision boxes fSR)
+  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors]
+        sensors = applySensors os (playerPosition p) 0.0
+        fCollision = getFLCollision sensors <|> getFRCollision sensors
         movingDownwards = (_y . playerVelocity) p >= 0.0
-        --grounded = traceShowId $ movingDownwards && isJust fsCollision && (_y (fromJust fsCollision)) < ((_y . playerPosition) p + gcPlayerHeight)
-        grounded = traceShowId $ movingDownwards && isJust fsCollision
-        newPlayerMode = if grounded
+        -- Ist der naechste Zustand der Bodenzustand?
+        newPlayerMode = case fCollision of
+          Nothing -> Air
+          Just (ObjectBox (Box r)) -> if movingDownwards && (_y . playerPosition) p + gcPlayerHeight > top r
                         then Ground
                         else Air
-        wSCollision = lineCollision boxes wS
-        newPlayerPositionX = case wSCollision of
-          Just (Point2 wsCx wsCy) -> if wsCx < (_x . playerPosition) p
-                                     then wsCx + gcWSSize + 1.0
-                                     else wsCx - (gcWSSize + 1.0)
+        newPlayerPositionX = case (getWCollision sensors) of
+          Just (ObjectBox (Box r)) -> if (_x . center) r < (_x . playerPosition) p
+                                     then (right r) + gcWSSize + 1.0
+                                     else (left r) - (gcWSSize + 1.0)
           Nothing -> (_x . playerPosition) p + timeDelta t * (_x . playerVelocity) p
         newPlayerPositionY = (_y . playerPosition) p + timeDelta t * (_y . playerVelocity) p
-        newPlayerVelocityX = if isJust wSCollision
+        newPlayerVelocityX = if isJust (getWCollision sensors)
                              then 0.0
                              else (_x . playerVelocity) p
-        newPlayerVelocityY = if grounded
-                             then 0.0
-                             else (_y . playerVelocity) p + timeDelta t * gcGrv
+        newPlayerVelocityY = (_y . playerVelocity) p + timeDelta t * gcGrv
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
           playerVelocity = Point2 newPlayerVelocityX newPlayerVelocityY
           }
-
 fillScreen :: GameData -> (Word8,Word8,Word8) -> IO ()
 fillScreen gd color = fillSurface (gdScreen gd) color
 

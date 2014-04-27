@@ -68,7 +68,7 @@ blitAtPosition sourceSurface destSurface pos = do
                  (floor (_y pos))
                  ((_x . dimensions) sClipRect)
                  ((_y . dimensions) sClipRect)
-  when (sClipRect `inside` sClipRect) $ (blitSurface sourceSurface Nothing destSurface (Just destRect) >> return ())
+  when (sClipRect `inside` scrClipRect) $ (blitSurface sourceSurface Nothing destSurface (Just destRect) >> return ())
 
 -- Wrapper um das etwas eklige pollEvent
 pollEvents :: IO [Event]
