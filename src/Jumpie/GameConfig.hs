@@ -6,6 +6,7 @@ module Jumpie.GameConfig(
   gcAir,
   gcGrv,
   gcAcc,
+  gcJmp,
   gcFrc,
   gcTimeMultiplier,
   initialGameState,
@@ -52,6 +53,9 @@ gcAcc = 0.046875
 
 gcAir :: Real
 gcAir = 2.0 * gcAcc
+
+gcJmp :: Real
+gcJmp = -6.5
 
 gcFrc :: Real
 gcFrc = gcAcc

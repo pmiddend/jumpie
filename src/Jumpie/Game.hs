@@ -2,7 +2,7 @@ module Jumpie.Game(processGame) where
 
 import Prelude(Double,(+),(-),(*),abs,signum)
 import Data.Ord((<),(>=),(>),min)
-import Data.Bool((&&))
+import Data.Bool((&&),(||),not)
 import Jumpie.Geometry.Point(Point2(..))
 import Jumpie.Geometry.Utility(clampAbs)
 import Jumpie.Types(TimeDelta,GameState,IncomingAction(..),GameObject(..),Player(Player),playerMode,PlayerMode(..),LineSegmentReal,box,PointReal,Real,isBox,SensorLine(SensorLine),playerPosition,Box(Box),timeDelta,playerVelocity,FrameState,getTimeDelta)
@@ -15,7 +15,7 @@ import Jumpie.Maybe(ifMaybe)
 import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
 import Data.Monoid(First(First),getFirst,mconcat)
 import Data.Function((.),($))
-import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir)
+import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir,gcJmp)
 
 processGame :: FrameState -> GameState -> [IncomingAction] -> GameState
 processGame fs gameObjects actions = concatMap (processGameObject fs gameObjects actions) gameObjects
@@ -70,7 +70,7 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         sensors = applySensors os (playerPosition p) 4.0
         t = getTimeDelta fs
         fCollision = getFLCollision sensors <|> getFRCollision sensors
-        newPlayerMode = if isNothing fCollision
+        newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
                         then Air
                         else Ground
         newPlayerPositionX = case getWCollision sensors of
@@ -81,7 +81,7 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         newPlayerPositionY = case fCollision of
           Just (ObjectBox (Box r)) -> top r - gcPlayerHeight
           _ -> (_y . playerPosition) p
-        newPlayerVelocityY = 0.0
+        newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
         oldPlayerVelocityX = (_x  . playerVelocity) p
         playerAcc = if PlayerLeft `elem` ias
                     then Just $ if oldPlayerVelocityX > 0.0 then -gcDec else (-gcAcc)
@@ -132,7 +132,10 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                              else case playerAcc of
                                Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
                                Nothing -> airDrag oldPlayerVelocityX
-        newPlayerVelocityY = (_y . playerVelocity) p + timeDelta t * gcGrv
+        oldPlayerVelocityY = (_y . playerVelocity) p
+        newPlayerVelocityY = if oldPlayerVelocityY < -4.0 && not (PlayerJump `elem` ias)
+                             then -4.0
+                             else oldPlayerVelocityY + timeDelta t * gcGrv
         airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125 then xv * 0.9685 else xv
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
