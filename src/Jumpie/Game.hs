@@ -131,8 +131,9 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                              then 0.0
                              else case playerAcc of
                                Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
-                               Nothing -> oldPlayerVelocityX
+                               Nothing -> airDrag oldPlayerVelocityX
         newPlayerVelocityY = (_y . playerVelocity) p + timeDelta t * gcGrv
+        airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125 then xv * 0.9685 else xv
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
