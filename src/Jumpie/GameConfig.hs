@@ -2,6 +2,8 @@ module Jumpie.GameConfig(
   gcWSSize,
   gcPlayerHeight,
   gcPlayerMaxSpeed,
+  gcDec,
+  gcAir,
   gcGrv,
   gcAcc,
   gcFrc,
@@ -19,7 +21,7 @@ import Jumpie.Geometry.Rect(Rect(Rect),bottomRight,topLeft)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
 import Data.Function(($))
 import Control.Applicative((<$>))
-import Data.List(map)
+import Data.List(map,(++))
 import Data.Int(Int)
 import Data.String(String)
 
@@ -48,8 +50,14 @@ gcPlayerMaxSpeed = 6.0
 gcAcc :: Real
 gcAcc = 0.046875
 
+gcAir :: Real
+gcAir = 2.0 * gcAcc
+
 gcFrc :: Real
 gcFrc = gcAcc
+
+gcDec :: Real
+gcDec = 0.5
 
 initialPlayer :: Player
 initialPlayer = Player {
@@ -59,13 +67,14 @@ initialPlayer = Player {
   }
 
 initialBoxes :: [Box]
-initialBoxes = map toBox [0..boxesPerScreen-1]
+initialBoxes = map (\x -> toBox x yBaseline) [0..boxesPerScreen-1] ++ otherBoxes
   where rectSize = 35
-        y = fromIntegral $ screenHeight `div` 2 - rectSize `div` 2
+        yBaseline = fromIntegral $ screenHeight `div` 2 - rectSize `div` 2
         boxesPerScreen = screenWidth `div` rectSize
-        toBox xRaw = Box $ Rect {
-          topLeft = Point2 (fromIntegral (xRaw*rectSize)) y,
-          bottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (y + fromIntegral rectSize)
+        otherBoxes = [toBox 2 (yBaseline - fromIntegral rectSize)]
+        toBox xRaw yRaw = Box $ Rect {
+          topLeft = Point2 (fromIntegral (xRaw*rectSize)) yRaw,
+          bottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (yRaw + fromIntegral rectSize)
           }
 
 initialGameState :: [GameObject]

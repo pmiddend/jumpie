@@ -15,7 +15,7 @@ import Jumpie.Maybe(ifMaybe)
 import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
 import Data.Monoid(First(First),getFirst,mconcat)
 import Data.Function((.),($))
-import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv)
+import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir)
 
 processGame :: FrameState -> GameState -> [IncomingAction] -> GameState
 processGame fs gameObjects actions = concatMap (processGameObject fs gameObjects actions) gameObjects
@@ -84,10 +84,10 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         newPlayerVelocityY = 0.0
         oldPlayerVelocityX = (_x  . playerVelocity) p
         playerAcc = if PlayerLeft `elem` ias
-                    then Just (-gcAcc)
+                    then Just $ if oldPlayerVelocityX > 0.0 then -gcDec else (-gcAcc)
                     else
                          if PlayerRight `elem` ias
-                         then Just gcAcc
+                         then Just $ if oldPlayerVelocityX < 0.0 then gcDec else gcAcc
                          else Nothing
         newPlayerVelocityX = case playerAcc of
           Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
@@ -102,7 +102,7 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
           }
 
 processAirPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
-processAirPlayerObject fs os _ p = [ObjectPlayer np] ++ sensorLines
+processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
   where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors]
         t = getTimeDelta fs
         sensors = applySensors os (playerPosition p) 0.0
@@ -120,9 +120,18 @@ processAirPlayerObject fs os _ p = [ObjectPlayer np] ++ sensorLines
                                      else (left r) - (gcWSSize + 1.0)
           _ -> (_x . playerPosition) p + timeDelta t * (_x . playerVelocity) p
         newPlayerPositionY = (_y . playerPosition) p + timeDelta t * (_y . playerVelocity) p
+        playerAcc = if PlayerLeft `elem` ias
+                    then Just (-gcAir)
+                    else
+                         if PlayerRight `elem` ias
+                         then Just gcAir
+                         else Nothing
+        oldPlayerVelocityX = (_x  . playerVelocity) p
         newPlayerVelocityX = if isJust (getWCollision sensors)
                              then 0.0
-                             else (_x . playerVelocity) p
+                             else case playerAcc of
+                               Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
+                               Nothing -> oldPlayerVelocityX
         newPlayerVelocityY = (_y . playerVelocity) p + timeDelta t * gcGrv
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
