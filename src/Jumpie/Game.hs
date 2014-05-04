@@ -42,13 +42,17 @@ data Sensors = Sensors {
   getW :: LineSegment PointReal,
   getFL :: LineSegment PointReal,
   getFR :: LineSegment PointReal,
+  getCL :: LineSegment PointReal,
+  getCR :: LineSegment PointReal,
   getWCollision :: Maybe GameObject,
   getFLCollision :: Maybe GameObject,
-  getFRCollision :: Maybe GameObject
+  getFRCollision :: Maybe GameObject,
+  getCLCollision :: Maybe GameObject,
+  getCRCollision :: Maybe GameObject
   }
 
 applySensors :: [GameObject] -> PointReal -> Real -> Sensors
-applySensors go p wSDev = Sensors wS fSL fSR wSCollision fSLCollision fSRCollision
+applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fSRCollision cSLCollision cSRCollision
   where boxes = filter isBox go
         wSCollision = lineCollision boxes wS
         wS = LineSegment (Point2 wSL wSY) (Point2 wSR wSY)
@@ -59,14 +63,20 @@ applySensors go p wSDev = Sensors wS fSL fSR wSCollision fSLCollision fSRCollisi
         fSRX = _x p + 9.0
         fSYTop = _y p + gcPlayerHeight
         fSYBottom = _y p + gcPlayerHeight + 16.0
+        cSYTop = _y p - gcPlayerHeight
+        cSYBottom = _y p - gcPlayerHeight - 16.0
         fSL = LineSegment (Point2 fSLX fSYTop) (Point2 fSLX fSYBottom)
         fSR = LineSegment (Point2 fSRX fSYTop) (Point2 fSRX fSYBottom)
+        cSL = LineSegment (Point2 fSLX cSYTop) (Point2 fSLX cSYBottom)
+        cSR = LineSegment (Point2 fSRX cSYTop) (Point2 fSRX cSYBottom)
         fSLCollision = lineCollision boxes fSL
         fSRCollision = lineCollision boxes fSR
+        cSLCollision = lineCollision boxes cSL
+        cSRCollision = lineCollision boxes cSR
 
 processGroundPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
 processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors]
+  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors,getCL sensors,getCR sensors]
         sensors = applySensors os (playerPosition p) 4.0
         t = getTimeDelta fs
         fCollision = getFLCollision sensors <|> getFRCollision sensors
@@ -103,10 +113,11 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
 
 processAirPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
 processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors]
+  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors,getCL sensors,getCR sensors]
         t = getTimeDelta fs
         sensors = applySensors os (playerPosition p) 0.0
         fCollision = getFLCollision sensors <|> getFRCollision sensors
+        cCollision = getCLCollision sensors <|> getCRCollision sensors
         movingDownwards = (_y . playerVelocity) p >= 0.0
         -- Ist der naechste Zustand der Bodenzustand?
         newPlayerMode = case fCollision of
@@ -133,9 +144,11 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                                Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
                                Nothing -> airDrag oldPlayerVelocityX
         oldPlayerVelocityY = (_y . playerVelocity) p
-        newPlayerVelocityY = if oldPlayerVelocityY < -4.0 && not (PlayerJump `elem` ias)
-                             then -4.0
-                             else oldPlayerVelocityY + timeDelta t * gcGrv
+        newPlayerVelocityY = if oldPlayerVelocityY < 0.0 && isJust cCollision
+                             then 0.0
+                             else if oldPlayerVelocityY < -4.0 && not (PlayerJump `elem` ias)
+                                  then -4.0
+                                  else oldPlayerVelocityY + timeDelta t * gcGrv
         airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125 then xv * 0.9685 else xv
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
