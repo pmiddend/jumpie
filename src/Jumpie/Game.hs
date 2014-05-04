@@ -2,13 +2,16 @@ module Jumpie.Game(processGame) where
 
 import Prelude(Double,(+),(-),(*),abs,signum)
 import Data.Ord((<),(>=),(>),min)
-import Data.Bool((&&),(||),not)
+import Data.Bool((&&),(||),not,Bool(False))
 import Jumpie.Geometry.Point(Point2(..))
+import Text.Show(show)
 import Jumpie.Geometry.Utility(clampAbs)
 import Jumpie.Types(TimeDelta,GameState,IncomingAction(..),GameObject(..),Player(Player),playerMode,PlayerMode(..),LineSegmentReal,box,PointReal,Real,isBox,SensorLine(SensorLine),playerPosition,Box(Box),timeDelta,playerVelocity,FrameState,getTimeDelta)
-import Jumpie.Geometry.Rect(top,center,right,left)
+import Jumpie.Debug(traceShowId)
+import Debug.Trace(trace)
+import Jumpie.Geometry.Rect(top,center,right,left,bottom)
 import Control.Applicative((<|>))
-import Data.Maybe(Maybe(..),isNothing,isJust)
+import Data.Maybe(Maybe(..),isNothing,isJust,fromJust)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Data.List(concatMap,map,filter,(++),elem)
 import Jumpie.Maybe(ifMaybe)
@@ -119,37 +122,51 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         fCollision = getFLCollision sensors <|> getFRCollision sensors
         cCollision = getCLCollision sensors <|> getCRCollision sensors
         movingDownwards = (_y . playerVelocity) p >= 0.0
+        oldPlayerPositionX = (_x . playerPosition) p
+        oldPlayerPositionY = (_y . playerPosition) p
+        oldPlayerVelocityX = (_x  . playerVelocity) p
+        oldPlayerVelocityY = (_y . playerVelocity) p
+        playerIsAboveBox b = case b of
+          (ObjectBox (Box r)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
+          _ -> False
+        playerIsBelowBox b = case b of
+          (ObjectBox (Box r)) -> oldPlayerPositionY + gcPlayerHeight > top r
+          _ -> False
         -- Ist der naechste Zustand der Bodenzustand?
         newPlayerMode = case fCollision of
-          Just (ObjectBox (Box r)) -> if movingDownwards && (_y . playerPosition) p + gcPlayerHeight > top r
-                        then Ground
-                        else Air
+          Just b -> if movingDownwards && playerIsBelowBox b
+                    then Ground
+                    else Air
           _ -> Air
-        newPlayerPositionX = case (getWCollision sensors) of
-          Just (ObjectBox (Box r)) -> if (_x . center) r < (_x . playerPosition) p
+        newPlayerPositionX = case getWCollision sensors of
+          Just (ObjectBox (Box r)) -> if (_x . center) r < oldPlayerPositionX
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
-          _ -> (_x . playerPosition) p + timeDelta t * (_x . playerVelocity) p
-        newPlayerPositionY = (_y . playerPosition) p + timeDelta t * (_y . playerVelocity) p
+          _ -> oldPlayerPositionX + timeDelta t * oldPlayerVelocityX
+        newPlayerPositionY = case cCollision of
+          Just b@(ObjectBox (Box r)) -> if oldPlayerVelocityY < 0.0 && playerIsBelowBox b
+                                        then bottom r + gcPlayerHeight
+                                        else oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
+          _ -> oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
         playerAcc = if PlayerLeft `elem` ias
                     then Just (-gcAir)
                     else
                          if PlayerRight `elem` ias
                          then Just gcAir
                          else Nothing
-        oldPlayerVelocityX = (_x  . playerVelocity) p
         newPlayerVelocityX = if isJust (getWCollision sensors)
                              then 0.0
                              else case playerAcc of
                                Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
                                Nothing -> airDrag oldPlayerVelocityX
-        oldPlayerVelocityY = (_y . playerVelocity) p
-        newPlayerVelocityY = if oldPlayerVelocityY < 0.0 && isJust cCollision
-                             then 0.0
+        newPlayerVelocityY = if oldPlayerVelocityY < 0.0 && isJust cCollision && playerIsAboveBox (fromJust cCollision)
+                             then timeDelta t * gcGrv
                              else if oldPlayerVelocityY < -4.0 && not (PlayerJump `elem` ias)
                                   then -4.0
                                   else oldPlayerVelocityY + timeDelta t * gcGrv
-        airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125 then xv * 0.9685 else xv
+        airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125
+                     then xv * 0.9685
+                     else xv
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
