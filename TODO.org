@@ -1,14 +1,39 @@
-  - [X] Zeichnen von Sprites testen (momentan unkompilierender Code)
-  - [X] Outgoingactions einbauen
-  - [ ] Soundsystem einbauen
-  - [X] Kollision zwischen Rechteck und Tiles programmieren und
-    testweise visualisieren (irgendwie mit Mausinteraktion oder so)
-    - [X] Kollision zwischen Linie und Linie
-      - [X] Zeichnen von Linien auf dem Bildschirm (Bresenham von irgendwo kopieren)
-      - [X] Zwei Linien zeichnen, die kollidieren. Kollision als Outgoingaction
-      - [X] Kollision zwischen zwei Rechtecken. Beide mit entsprechend
-        grossen Sprites einzeichnen. Kollision im Zentrum des einen
-        Rechtecks visualisieren
+* Animationssystem
+  - Atlasing, online oder offline
+    - Offline: man tut mehrere Bilder mit PS in eins und schreibt eine
+      JSON-Datei, wo welches Bild liegt
+      - Inhalt der Datei: Paare von Bezeichner und Koordinaten und Groesse:
+	#+BEGIN_SRC json
+	{
+	  "player_fly_l" : [[0,0],[40,40]],
+	  "player_fly_r" : [[0,0],[40,40]]
+	}
+	#+END_SRC
+      - Gespiegelte Bilder von Hand oder automatisch?
+	#+BEGIN_SRC json
+	{
+	  "player_fly_l" : [[0,0],[40,40]],
+	  "player_fly_r" : "mirror player_fly_l"
+	}
+	#+END_SRC
+      - Animationen separat von Bildstrukturen, separates Element (pro png-Datei):
+	#+BEGIN_SRC json
+	{
+	  "images" : {
+	    "player_walk_0" : [[0,0],[40,40]]
+	    "player_walk_1" : [[41,0],[40,40]]
+          },
+	  "animations" : {
+	    "player_walk" : { "frame_duration_secs" : 0.1, "frames" : ["player_walk_0","player_walk_1"] }
+	  }
+	}
+	#+END_SRC
+      - Verarbeitung
+	- Bilder werden wie gehabt in Form von Paaren zwischen Bild
+          und Position/Groesse eingelesen (=SurfaceData=).
+	- Separate Animationsstruktur wird aufgebaut mit Animation als Menge von Surface-IDs erstmal.
+    - Online: man tut die Bilder in benannte Ordner und das Programm
+      kompiliert das zu ein oder mehreren geatlasten Bildern
 * Sonicphysik
 ** Gesetze
 
