@@ -143,7 +143,7 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                                      else (left r) - (gcWSSize + 1.0)
           _ -> oldPlayerPositionX + timeDelta t * oldPlayerVelocityX
         newPlayerPositionY = case cCollision of
-          Just b@(ObjectBox (Box r)) -> if oldPlayerVelocityY < 0.0 && playerIsBelowBox b
+          Just b@(ObjectBox (Box r)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
                                         then bottom r + gcPlayerHeight
                                         else oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
           _ -> oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
