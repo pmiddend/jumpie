@@ -1,0 +1,2 @@
+player_stand=0,0,32,40
+player_fly_right=33,0,67,40

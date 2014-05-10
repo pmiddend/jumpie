@@ -1,5 +1,6 @@
 module Jumpie.Types(
   TimeDelta(TimeDelta),
+  RectReal,
   timeDelta,
   IncomingAction(..),
   GameObject(..),
@@ -13,7 +14,6 @@ module Jumpie.Types(
   box,
   GameTicks(GameTicks),
   tickValue,
-  surfaceId,
   GameData(GameData),
   gdSurfaces,
   gdScreen,
@@ -26,14 +26,16 @@ module Jumpie.Types(
   PlayerMode(..),
   PointReal,
   Real,
-  SurfaceId(SurfaceId),
   RectInt,
-  SurfaceData,
-  SurfaceMap,
   FrameState(FrameState),
   getTimeDelta,
   getKeydowns,
-  Keydowns
+  Keydowns,
+  ImageId,
+  ImageMap,
+  ImageDescFile,
+  SurfaceData,
+  SurfaceMap
   ) where
 
 import Prelude(Double)
@@ -43,10 +45,12 @@ import Jumpie.Geometry.LineSegment(LineSegment)
 import Data.Word(Word64)
 import Data.String(String)
 import Jumpie.Geometry.Rect(Rect())
+import Data.Map.Strict(Map)
 import Data.Int(Int)
 import Jumpie.Geometry.Point(Point2(..))
 import Graphics.UI.SDL.Types(Surface)
 import Graphics.UI.SDL.Keysym(SDLKey)
+import System.FilePath
 
 newtype TimeDelta = TimeDelta { timeDelta :: Double }
 
@@ -55,13 +59,17 @@ newtype Box = Box { box :: RectReal }
 
 newtype GameTicks = GameTicks { tickValue :: Word64 }
 
-newtype SurfaceId = SurfaceId { surfaceId :: String } deriving(Eq)
-
 type RectInt = Rect (Point2 Int)
+
+type ImageId = String
+
+type ImageMap = Map ImageId RectInt
+
+type ImageDescFile = FilePath
 
 type SurfaceData = (Surface,RectInt)
 
-type SurfaceMap = [(SurfaceId,SurfaceData)]
+type SurfaceMap = Map ImageId SurfaceData
 
 data GameData = GameData {
                 gdSurfaces :: SurfaceMap,

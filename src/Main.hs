@@ -1,15 +1,15 @@
 module Main where
 
 import Control.Applicative((<$>),(*>),pure)
-import Control.Monad(return,unless,mapM,filterM)
+import Control.Monad(return,unless)
 import Data.Bool(Bool(..))
 import Data.Eq((==))
 import Data.Foldable(traverse_)
 import Data.Function(($),(.))
 import Data.Functor(fmap)
 import Data.Int(Int)
-import Data.List(any,lookup,(++),zip,map,(\\),union,filter,concatMap)
-import Data.Maybe(Maybe(..))
+import Jumpie.Imagedata(readAllDescFiles)
+import Data.List(any,map,(\\),union,filter,concatMap)
 import Data.Tuple(fst,snd)
 import Data.Word(Word64)
 import Data.Word(Word8)
@@ -17,7 +17,7 @@ import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
 import Graphics.UI.SDL.Keysym(SDLKey(..))
-import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface,surfaceGetWidth,surfaceGetHeight)
+import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface)
 import Graphics.UI.SDL.Video(setVideoMode)
 import Graphics.UI.SDL.WindowManagement(setCaption)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
@@ -25,29 +25,27 @@ import Jumpie.GameConfig(gcTimeMultiplier,initialGameState,screenWidth,screenHei
 import Jumpie.Game(processGame)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Jumpie.Geometry.Point(Point2(..),vmult)
-import Jumpie.Geometry.Rect(Rect(Rect),topLeft,dimensions)
+import Jumpie.Geometry.Rect(topLeft,dimensions)
 import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham,pollEvents)
-import Jumpie.Types(IncomingAction(..),GameData(GameData),SurfaceId(SurfaceId),SurfaceData,gdSurfaces,surfaceId,RectInt,playerPosition,Box(Box),GameObject(..),gdScreen,PointReal,GameState,TimeDelta(TimeDelta),tickValue,SurfaceMap,SensorLine(SensorLine),GameTicks(GameTicks),Player,playerMode,PlayerMode(..),Keydowns,FrameState(FrameState),getTimeDelta,getKeydowns)
+import Jumpie.Types(ImageId,IncomingAction(..),GameData(GameData),SurfaceData,gdSurfaces,RectInt,playerPosition,Box(Box),GameObject(..),gdScreen,PointReal,GameState,TimeDelta(TimeDelta),tickValue,SensorLine(SensorLine),GameTicks(GameTicks),Player,playerMode,PlayerMode(..),Keydowns,FrameState(FrameState),getTimeDelta,getKeydowns)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral)
 import System.Clock(Clock(Monotonic),getTime,TimeSpec(TimeSpec))
-import System.Directory(getDirectoryContents,doesFileExist)
 import System.FilePath
 import System.IO(IO)
+import Data.Map.Strict((!))
 
 -- Umgebungsvariablen Anfang
 
 -- Umgebungsvariablen Ende
 
-getImageData :: GameData -> SurfaceId -> SurfaceData
-getImageData gd sid = case lookup sid (gdSurfaces gd) of
-  Nothing -> error $ "Image " ++ surfaceId sid ++ " not found!"
-  Just im -> im
+getImageData :: GameData -> ImageId -> SurfaceData
+getImageData gd sid = gdSurfaces gd ! sid
 
-getImage :: GameData -> SurfaceId -> Surface
+getImage :: GameData -> ImageId -> Surface
 -- TODO: .:. hier?
 getImage gd sid = fst $ getImageData gd sid
 
-getImageRect :: GameData -> SurfaceId -> RectInt
+getImageRect :: GameData -> ImageId -> RectInt
 getImageRect gd sid = snd $ getImageData gd sid
 
 fillScreen :: GameData -> (Word8,Word8,Word8) -> IO ()
@@ -77,13 +75,13 @@ renderObject :: GameData -> GameObject -> IO ()
 renderObject gd ob = case ob of
   ObjectPlayer p -> renderPlayer gd p
   ObjectSensorLine (SensorLine s) -> surfaceBresenham (gdScreen gd) (255,0,0) (toIntLine s)
-  ObjectBox (Box b) -> blitAt gd (getImage gd (SurfaceId "platform")) (topLeft b)
+  ObjectBox (Box b) -> blitAt gd "platform" (topLeft b)
 
 renderPlayer :: GameData -> Player -> IO ()
-renderPlayer gd p = blitAt gd playerImage ((playerPosition p) - ((vmult 0.5) $ toPointReal $ dimensions playerRect))
-  where (playerImage,playerRect) = if playerMode p == Air then playerFly else playerGround
-        playerFly = getImageData gd (SurfaceId "playerfly")
-        playerGround = getImageData gd (SurfaceId "player")
+renderPlayer gd p = blitAt gd playerImage pp
+  where pp = (playerPosition p) - ((vmult 0.5) $ toPointReal $ dimensions playerRect)
+        playerImage = if playerMode p == Air then "player_fly_right" else "player_stand"
+        (_,playerRect) = gdSurfaces gd ! playerImage
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
 mainLoop _ gameData gameState frameState = renderGame gameData newState *> pure newState
@@ -96,8 +94,8 @@ kdToAction SDLK_RIGHT = [PlayerRight]
 kdToAction SDLK_UP = [PlayerJump]
 kdToAction _ = []
 
-blitAt :: GameData -> Surface -> PointReal -> IO ()
-blitAt gd s pos = blitAtPosition s (gdScreen gd) pos
+blitAt :: GameData -> ImageId -> PointReal -> IO ()
+blitAt gd image pos = blitAtPosition ((gdSurfaces gd) ! image) pos (gdScreen gd)
 
 loadImage :: FilePath -> IO Surface
 loadImage = load . (mediaDir </>)
@@ -143,18 +141,10 @@ getTicks = do
   (TimeSpec s ns) <- getTime Monotonic
   return $ GameTicks $ ((fromIntegral s :: Word64) * 1000 * 1000 * 1000) + fromIntegral ns
 
-loadImages :: IO SurfaceMap
-loadImages = do
-  unfilteredContents <- getDirectoryContents mediaDir
-  filteredContents <- filterM (doesFileExist . (mediaDir </>)) unfilteredContents
-  ioImages <- mapM loadImage filteredContents
-  let ioImageSizes = map (\im -> Rect (Point2 0 0) (Point2 (surfaceGetWidth im) (surfaceGetHeight im))) ioImages
-  return $ zip ((SurfaceId . dropExtension) <$> filteredContents) (zip ioImages ioImageSizes)
-
 main :: IO ()
 main = withInit [InitEverything] $ do
     screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
-    images <- loadImages
+    images <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
     outerMainLoop [] (GameData images screen) initialGameState ticks
