@@ -16,12 +16,13 @@ module Jumpie.GameConfig(
   mediaDir
   ) where
 
-import Jumpie.Types(Real,Player(Player),playerPosition,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..))
+import Jumpie.Types(Real,Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..))
 import Jumpie.Geometry.Point(Point2(Point2))
 import Jumpie.Geometry.Rect(Rect(Rect),bottomRight,topLeft)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
 import Data.Function(($))
 import Control.Applicative((<$>))
+import Data.Maybe(Maybe(Nothing))
 import Data.List(map,(++))
 import Data.Int(Int)
 import Data.String(String)
@@ -67,7 +68,8 @@ initialPlayer :: Player
 initialPlayer = Player {
   playerPosition = Point2 (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 4.0),
   playerMode = Air,
-  playerVelocity = Point2 0.0 0.0
+  playerVelocity = Point2 0.0 0.0,
+  playerWalkSince = Nothing
   }
 
 initialBoxes :: [Box]

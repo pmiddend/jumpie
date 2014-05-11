@@ -8,7 +8,6 @@ module Jumpie.SDLHelper(
   fromSDLRect
   ) where
 
-import Data.Function((.))
 import Graphics.UI.SDL.Events(Event(NoEvent),pollEvent)
 import Jumpie.Geometry.Point(Point2(Point2),_y,_x)
 import Jumpie.Geometry.LineSegment(LineSegment)
@@ -22,7 +21,7 @@ import Graphics.UI.SDL.Types(Surface,surfaceGetPixelFormat,surfaceGetPixels,surf
 import Data.Maybe(Maybe(..))
 import Graphics.UI.SDL.Video(mapRGB,lockSurface,unlockSurface,getClipRect,fillRect,blitSurface)
 import Graphics.UI.SDL.Color(Pixel(Pixel))
-import Control.Monad(forM_,return,when,(>>))
+import Control.Monad(forM_,return,when)
 import Jumpie.Geometry.Rect(inside)
 import Data.Function(($))
 import Data.Word(Word8)

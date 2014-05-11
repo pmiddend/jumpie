@@ -1,23 +1,22 @@
 module Jumpie.Game(processGame) where
 
-import Prelude(Double,(+),(-),(*),abs,signum)
-import Data.Ord((<),(>=),(>),min)
-import Data.Bool((&&),(||),not,Bool(False))
-import Jumpie.Geometry.Point(Point2(..))
-import Jumpie.Geometry.Utility(clampAbs)
-import Jumpie.Types(TimeDelta,GameState,IncomingAction(..),GameObject(..),Player(Player),playerMode,PlayerMode(..),LineSegmentReal,box,PointReal,Real,isBox,SensorLine(SensorLine),playerPosition,Box(Box),timeDelta,playerVelocity,FrameState,getTimeDelta)
-import Jumpie.Debug(traceShowId)
-import Debug.Trace(trace)
-import Jumpie.Geometry.Rect(top,center,right,left,bottom)
 import Control.Applicative((<|>))
-import Data.Maybe(Maybe(..),isNothing,isJust,fromJust)
-import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
-import Data.List(concatMap,map,filter,(++),elem)
-import Jumpie.Maybe(ifMaybe)
-import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
-import Data.Monoid(First(First),getFirst,mconcat)
+import Data.Bool((&&),(||),not,Bool(False))
+import Data.Eq((==))
 import Data.Function((.),($))
+import Data.List(concatMap,map,filter,(++),elem)
+import Data.Maybe(Maybe(..),isNothing,isJust,fromJust)
+import Data.Monoid(First(First),getFirst,mconcat)
+import Data.Ord((<),(>=),(>),min)
 import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir,gcJmp)
+import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
+import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
+import Jumpie.Geometry.Point(Point2(..))
+import Jumpie.Geometry.Rect(top,center,right,left,bottom)
+import Jumpie.Geometry.Utility(clampAbs)
+import Jumpie.Maybe(ifMaybe)
+import Jumpie.Types(TimeDelta,GameState,IncomingAction(..),GameObject(..),Player(Player),playerMode,PlayerMode(..),LineSegmentReal,box,PointReal,Real,isBox,SensorLine(SensorLine),playerPosition,Box(Box),timeDelta,playerVelocity,FrameState,getTimeDelta,playerWalkSince,getCurrentTicks)
+import Prelude(Double,(+),(-),(*),abs,signum)
 
 processGame :: FrameState -> GameState -> [IncomingAction] -> GameState
 processGame fs gameObjects actions = concatMap (processGameObject fs gameObjects actions) gameObjects
@@ -110,7 +109,8 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
-          playerVelocity = newPlayerVelocity
+          playerVelocity = newPlayerVelocity,
+          playerWalkSince = if newPlayerMode == Ground then (playerWalkSince p) else Nothing
           }
 
 processAirPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
@@ -169,5 +169,6 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         np = Player {
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
-          playerVelocity = Point2 newPlayerVelocityX newPlayerVelocityY
+          playerVelocity = Point2 newPlayerVelocityX newPlayerVelocityY,
+          playerWalkSince = if newPlayerMode == Ground then Just (getCurrentTicks fs) else Nothing
           }

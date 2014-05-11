@@ -1,6 +1,12 @@
 module Jumpie.Types(
   TimeDelta(TimeDelta),
+  getCurrentTicks,
+  AnimId,
+  AnimMap,
   RectReal,
+  Animation(Animation),
+  getAnimFrameSwitch,
+  getAnimFrames,
   timeDelta,
   IncomingAction(..),
   GameObject(..),
@@ -17,11 +23,13 @@ module Jumpie.Types(
   GameData(GameData),
   gdSurfaces,
   gdScreen,
+  gdAnims,
   LineSegmentReal,
   Player(Player),
   playerPosition,
   playerMode,
   playerVelocity,
+  playerWalkSince,
   OutgoingAction(..),
   PlayerMode(..),
   PointReal,
@@ -39,6 +47,7 @@ module Jumpie.Types(
   ) where
 
 import Prelude(Double)
+import Data.Maybe(Maybe)
 import Data.Bool(Bool(..))
 import Data.Eq(Eq)
 import Jumpie.Geometry.LineSegment(LineSegment)
@@ -73,6 +82,7 @@ type SurfaceMap = Map ImageId SurfaceData
 
 data GameData = GameData {
                 gdSurfaces :: SurfaceMap,
+                gdAnims :: AnimMap,
                 gdScreen :: Surface
               }
 
@@ -86,7 +96,8 @@ data PlayerMode = Ground | Air deriving(Eq)
 data Player = Player {
   playerPosition :: PointReal,
   playerMode :: PlayerMode,
-  playerVelocity :: PointReal
+  playerVelocity :: PointReal,
+  playerWalkSince :: Maybe GameTicks
   }
 
 data OutgoingAction = Collision
@@ -112,6 +123,16 @@ type GameState = [GameObject]
 type Keydowns = [SDLKey]
 
 data FrameState = FrameState {
-  getTimeDelta :: TimeDelta,
-  getKeydowns :: Keydowns
+  getCurrentTicks :: !GameTicks,
+  getTimeDelta :: !TimeDelta,
+  getKeydowns :: !Keydowns
   }
+
+data Animation = Animation {
+  getAnimFrameSwitch :: Int,
+  getAnimFrames :: [ImageId]
+  }
+
+type AnimId = String
+
+type AnimMap = Map AnimId Animation

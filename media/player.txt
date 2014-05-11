@@ -1,2 +1,9 @@
 player_stand=0,0,32,40
 player_fly_right=33,0,67,40
+player_fly_left=68,0,102,40
+player_walk_right_0=0,41,30,81
+player_walk_right_1=31,41,61,81
+player_walk_left_0=62,41,92,81
+player_walk_left_1=93,41,123,81
+>player_walk_right=250|player_walk_right_0,player_walk_right_1
+>player_walk_left=250|player_walk_left_0,player_walk_left_1

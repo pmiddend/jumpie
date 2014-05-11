@@ -2,17 +2,24 @@ module Main where
 
 import Control.Applicative((<$>),(*>),pure)
 import Control.Monad(return,unless)
-import Data.Bool(Bool(..))
+import Jumpie.Debug(traceShowId)
+import Data.Bool(Bool(..),(||))
+import Data.Maybe(isNothing,fromJust)
 import Data.Eq((==))
 import Data.Foldable(traverse_)
+import Data.Map.Strict(keys)
 import Data.Function(($),(.))
 import Data.Functor(fmap)
 import Data.Int(Int)
-import Jumpie.Imagedata(readAllDescFiles)
-import Data.List(any,map,(\\),union,filter,concatMap)
+import Debug.Trace(trace)
+import Data.List(any,map,(\\),union,filter,concatMap,(++),(!!),length)
+import Text.Show(show)
+import Data.Map.Strict((!))
 import Data.Tuple(fst,snd)
 import Data.Word(Word64)
 import Data.Word(Word8)
+import Data.Ord((<=))
+import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
@@ -20,19 +27,18 @@ import Graphics.UI.SDL.Keysym(SDLKey(..))
 import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface)
 import Graphics.UI.SDL.Video(setVideoMode)
 import Graphics.UI.SDL.WindowManagement(setCaption)
-import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
-import Jumpie.GameConfig(gcTimeMultiplier,initialGameState,screenWidth,screenHeight,screenBpp,mediaDir)
 import Jumpie.Game(processGame)
+import Jumpie.GameConfig(gcTimeMultiplier,initialGameState,screenWidth,screenHeight,screenBpp,mediaDir)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Jumpie.Geometry.Point(Point2(..),vmult)
 import Jumpie.Geometry.Rect(topLeft,dimensions)
+import Jumpie.Imagedata(readAllDescFiles)
 import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham,pollEvents)
-import Jumpie.Types(ImageId,IncomingAction(..),GameData(GameData),SurfaceData,gdSurfaces,RectInt,playerPosition,Box(Box),GameObject(..),gdScreen,PointReal,GameState,TimeDelta(TimeDelta),tickValue,SensorLine(SensorLine),GameTicks(GameTicks),Player,playerMode,PlayerMode(..),Keydowns,FrameState(FrameState),getTimeDelta,getKeydowns)
-import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral)
+import Jumpie.Types(ImageId,IncomingAction(..),GameData(GameData),SurfaceData,gdSurfaces,RectInt,playerPosition,Box(Box),GameObject(..),gdScreen,PointReal,GameState,TimeDelta(TimeDelta),tickValue,SensorLine(SensorLine),GameTicks(GameTicks),Player,playerMode,PlayerMode(..),Keydowns,FrameState(FrameState),getTimeDelta,getKeydowns,playerVelocity,getCurrentTicks,getAnimFrames,playerWalkSince,getAnimFrameSwitch,gdAnims)
+import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.Clock(Clock(Monotonic),getTime,TimeSpec(TimeSpec))
 import System.FilePath
 import System.IO(IO)
-import Data.Map.Strict((!))
 
 -- Umgebungsvariablen Anfang
 
@@ -68,23 +74,32 @@ toIntLine = fmap (fmap floor)
 toPointReal :: Integral a => Point2 a -> PointReal
 toPointReal p = fromIntegral <$> p
 
-renderGame :: GameData -> GameState -> IO ()
-renderGame gd go = fillScreen gd backgroundColor *> traverse_ (renderObject gd) go
+renderGame :: GameData -> FrameState -> GameState -> IO ()
+renderGame gd fs go = fillScreen gd backgroundColor *> traverse_ (renderObject gd fs) go
 
-renderObject :: GameData -> GameObject -> IO ()
-renderObject gd ob = case ob of
-  ObjectPlayer p -> renderPlayer gd p
+renderObject :: GameData -> FrameState -> GameObject -> IO ()
+renderObject gd fs ob = case ob of
+  ObjectPlayer p -> renderPlayer gd fs p
   ObjectSensorLine (SensorLine s) -> surfaceBresenham (gdScreen gd) (255,0,0) (toIntLine s)
   ObjectBox (Box b) -> blitAt gd "platform" (topLeft b)
 
-renderPlayer :: GameData -> Player -> IO ()
-renderPlayer gd p = blitAt gd playerImage pp
+renderPlayer :: GameData -> FrameState -> Player -> IO ()
+renderPlayer gd fs p = blitAt gd playerImage pp
   where pp = (playerPosition p) - ((vmult 0.5) $ toPointReal $ dimensions playerRect)
-        playerImage = if playerMode p == Air then "player_fly_right" else "player_stand"
+        playerImage = if playerMode p == Air
+                      then ("player_fly_" ++ playerDirection)
+                      else if playerStands || isNothing (playerWalkSince p)
+                           then "player_stand"
+                           else playerImageWalk (fromJust (playerWalkSince p))
+        playerStands = abs ((_x . playerVelocity) p) <= 0.01
+        playerImageWalk walkSince = getAnimFrames playerWalkAnim !! (playerImageWalkIndex walkSince)
+        playerImageWalkIndex walkSince = (floor (((getCurrentTicks fs) `tickDiffSecs` walkSince) / (fromIntegral (getAnimFrameSwitch playerWalkAnim) / 1000.0))) `mod` (length (getAnimFrames playerWalkAnim))
+        playerWalkAnim = (gdAnims gd) ! ("player_walk_" ++ playerDirection)
+        playerDirection = if (_x . playerVelocity) p <= 0.0 then "left" else "right"
         (_,playerRect) = gdSurfaces gd ! playerImage
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
-mainLoop _ gameData gameState frameState = renderGame gameData newState *> pure newState
+mainLoop _ gameData gameState frameState = renderGame gameData frameState newState *> pure newState
   where newState = processGame frameState gameState incomingActions
         incomingActions = concatMap kdToAction (getKeydowns frameState)
 
@@ -110,6 +125,7 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
       let newKeyDowns = processKeydowns oldKeydowns events
       let frameState = FrameState {
         getTimeDelta = TimeDelta (gcTimeMultiplier * tickDiff),
+        getCurrentTicks = newTicks,
         getKeydowns = newKeyDowns
         }
       newGameState <- mainLoop events gameData gameState frameState
@@ -141,10 +157,13 @@ getTicks = do
   (TimeSpec s ns) <- getTime Monotonic
   return $ GameTicks $ ((fromIntegral s :: Word64) * 1000 * 1000 * 1000) + fromIntegral ns
 
+tickDiffSecs :: GameTicks -> GameTicks -> Double
+tickDiffSecs a b = fromIntegral (tickValue a - tickValue b) / (1000.0 * 1000.0 * 1000.0)
+
 main :: IO ()
 main = withInit [InitEverything] $ do
     screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
-    images <- readAllDescFiles
+    (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
-    outerMainLoop [] (GameData images screen) initialGameState ticks
+    outerMainLoop [] (GameData images anims screen) initialGameState ticks

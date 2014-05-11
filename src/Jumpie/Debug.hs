@@ -2,7 +2,7 @@ module Jumpie.Debug(
   traceShowId
   ) where
 
-import Text.Show(Show)
+import Text.Show(Show,show)
 import Debug.Trace(trace)
 
 traceShowId :: Show a => a -> a
