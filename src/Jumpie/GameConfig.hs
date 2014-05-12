@@ -16,9 +16,10 @@ module Jumpie.GameConfig(
   mediaDir
   ) where
 
-import Jumpie.Types(Real,Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..))
+import Jumpie.GameObject(Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..))
+import Jumpie.Types(Real)
 import Jumpie.Geometry.Point(Point2(Point2))
-import Jumpie.Geometry.Rect(Rect(Rect),bottomRight,topLeft)
+import Jumpie.Geometry.Rect(Rect(Rect),rectBottomRight,rectTopLeft)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
 import Data.Function(($))
 import Control.Applicative((<$>))
@@ -79,8 +80,8 @@ initialBoxes = map (\x -> toBox x yBaseline) [0..boxesPerScreen-1] ++ otherBoxes
         boxesPerScreen = screenWidth `div` rectSize
         otherBoxes = [toBox 2 (yBaseline - fromIntegral rectSize),toBox 10 (yBaseline - 3.0 * fromIntegral rectSize)]
         toBox xRaw yRaw = Box $ Rect {
-          topLeft = Point2 (fromIntegral (xRaw*rectSize)) yRaw,
-          bottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (yRaw + fromIntegral rectSize)
+          rectTopLeft = Point2 (fromIntegral (xRaw*rectSize)) yRaw,
+          rectBottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (yRaw + fromIntegral rectSize)
           }
 
 initialGameState :: [GameObject]

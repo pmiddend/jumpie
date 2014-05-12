@@ -1,7 +1,7 @@
 module Jumpie.Geometry.Rect(
   Rect(Rect),
-  topLeft,
-  bottomRight,
+  rectTopLeft,
+  rectBottomRight,
   inside,
   lineSegments,
   dimensions,
@@ -12,7 +12,7 @@ module Jumpie.Geometry.Rect(
   right
   ) where
 
-import Jumpie.Geometry.Point(Point2(Point2),_x,_y,toList,vmult)
+import Jumpie.Geometry.Point(Point2(Point2),pX,pY,toList,vmult)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Data.Ord(Ord,(>=),(<=))
 import Prelude((-),Num,Fractional,(+))
@@ -20,7 +20,7 @@ import Data.Functor(Functor,fmap)
 import Data.Bool(Bool,(&&))
 import Text.Show(Show)
 
-data Rect a = Rect { topLeft :: a, bottomRight :: a } deriving(Show)
+data Rect a = Rect { rectTopLeft :: a, rectBottomRight :: a } deriving(Show)
 
 instance Functor Rect where
   fmap f (Rect a b) = Rect (f a) (f b)
@@ -34,10 +34,10 @@ lineSegments (Rect tl br) = [
   LineSegment (Point2 _right _top) (Point2 _right _bottom),
   LineSegment (Point2 _right _bottom) (Point2 _left _bottom),
   LineSegment (Point2 _left _bottom) (Point2 _left _top)]
-  where _left = _x tl
-        _right = _x br
-        _top = _y tl
-        _bottom = _y br
+  where _left = pX tl
+        _right = pX br
+        _top = pY tl
+        _bottom = pY br
 
 dimensions :: Num a => Rect (Point2 a) -> Point2 a
 dimensions (Rect tl br) = br - tl

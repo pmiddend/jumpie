@@ -1,7 +1,7 @@
 module Jumpie.Geometry.Point(
   Point2(Point2),
-  _x,
-  _y,
+  pX,
+  pY,
   cross,
   dot,
   vmult,
@@ -14,14 +14,14 @@ import Data.Functor(fmap,Functor)
 import Control.Applicative(Applicative,(<*>),pure,liftA2)
 import Text.Show(Show)
 
-data Point2 a = Point2 { _x :: a, _y :: a } deriving(Show)
+data Point2 a = Point2 { pX :: a, pY :: a } deriving(Show)
 
 instance Functor Point2 where
   fmap f (Point2 a b) = Point2 (f a) (f b)
 
 instance Applicative Point2 where
   pure s = Point2 s s
-  pf <*> pa = Point2 ((_x pf) (_x pa)) ((_y pf) (_y pa))
+  pf <*> pa = Point2 ((pX pf) (pX pa)) ((pY pf) (pY pa))
 
 instance Num a => Num (Point2 a) where
   (+) = liftA2 (+)

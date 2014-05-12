@@ -1,12 +1,12 @@
 module Jumpie.Geometry.LineSegment(
   LineSegment(LineSegment),
-  from,
-  to,
+  lineSegmentFrom,
+  lineSegmentTo,
   pointList) where
 
 import Data.Functor(Functor,fmap)
 
-data LineSegment a = LineSegment { from :: a,to :: a }
+data LineSegment a = LineSegment { lineSegmentFrom :: a,lineSegmentTo :: a }
 
 instance Functor LineSegment where
   fmap f (LineSegment a b) = LineSegment (f a) (f b)

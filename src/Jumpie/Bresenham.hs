@@ -6,13 +6,13 @@ import Prelude(abs,(-),(+),(*),Num)
 import Data.Ord((>),(<),(>=),Ord)
 import Data.Maybe(Maybe(..))
 import Data.Bool(otherwise)
-import Jumpie.Geometry.Point(Point2(..),_x,_y,toTuple)
+import Jumpie.Geometry.Point(Point2(..),pX,pY,toTuple)
 import Jumpie.Geometry.LineSegment(LineSegment(..))
 
 bresenham :: (Num a,Ord a) => LineSegment (Point2 a) -> [Point2 a]
 bresenham (LineSegment pa pb) = map maySwitch . unfoldr go $ (x1,y1,0)
   where
-    steep = abs ((_y pb) - (_y pa)) > abs ((_x pb) - (_x pa))
+    steep = abs ((pY pb) - (pY pa)) > abs ((pX pb) - (pX pa))
     maySwitch = if steep then (\(Point2 x y) -> Point2 y x) else id
     [(x1,y1),(x2,y2)] = (sort . map toTuple) [maySwitch pa, maySwitch pb]
     deltax = x2 - x1

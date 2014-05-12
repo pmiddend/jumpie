@@ -9,12 +9,12 @@ module Jumpie.SDLHelper(
   ) where
 
 import Graphics.UI.SDL.Events(Event(NoEvent),pollEvent)
-import Jumpie.Geometry.Point(Point2(Point2),_y,_x)
+import Jumpie.Geometry.Point(Point2(Point2),pY,pX)
 import Jumpie.Geometry.LineSegment(LineSegment)
 import Jumpie.Geometry.Rect(Rect(Rect),dimensions)
 import Jumpie.Monad(when_)
 import Jumpie.Geometry.Intersection(lineSegmentInsideRect)
-import Jumpie.Types(SurfaceData)
+import Jumpie.ImageData(SurfaceData)
 import Prelude((+),(*),RealFrac,floor,(-))
 import qualified Graphics.UI.SDL.Rect as SDLR
 import Graphics.UI.SDL.Types(Surface,surfaceGetPixelFormat,surfaceGetPixels,surfaceGetWidth)
@@ -38,7 +38,7 @@ createPixel s (r,g,b) = mapRGB (surfaceGetPixelFormat s) r g b
 putPixel32 :: Point2 Int -> Pixel -> Surface -> IO ()
 putPixel32 p (Pixel pixel) s = do
   pixels <- castPtr <$> surfaceGetPixels s
-  pokeElemOff pixels (((_y p) * surfaceGetWidth s) + (_x p)) pixel
+  pokeElemOff pixels (((pY p) * surfaceGetWidth s) + (pX p)) pixel
 
 surfaceBresenham :: Surface -> (Word8,Word8,Word8) -> LineSegment (Point2 Int) -> IO ()
 surfaceBresenham s rawColor line = do

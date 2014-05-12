@@ -1,6 +1,13 @@
-- [ ] Animationssystem
+- [0/1] Animationssystem
+  - [ ] Ggf. Animation abhaengig von Spielergeschwindigkeit machen
+    (mit einem Koeffizienten neben der momentan berechneten
+    Geschwindigkeit)
+- [X] Bei Recordtypen auf get-Notation umsteigen
+- [ ] Alle Typen aus =Types= auslagern
+- [ ] Renderfunktionen in =Render=-Modul auslagern
 - [ ] Sounds
 - [ ] Fonts
+- [ ] Einheitensystem, um die haessliche Konvertierung von =GameTicks= z.B. zu vermeiden
 - [ ] Zufaellige Levelgenerierung
 - [ ] Geschosse, Gegner
 - [ ] Punkte

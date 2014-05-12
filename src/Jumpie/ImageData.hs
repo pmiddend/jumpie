@@ -1,8 +1,13 @@
 {-# LANGUAGE TupleSections,FlexibleContexts #-}
-module Jumpie.Imagedata(
+module Jumpie.ImageData(
   ImageId,
   ImageMap,
-  readAllDescFiles
+  AnimMap,
+  readAllDescFiles,
+  animFrameSwitch,
+  animFrames,
+  SurfaceMap,
+  SurfaceData
   ) where
 
 import Control.Monad(filterM,(>>=))
@@ -11,7 +16,7 @@ import Data.Function((.))
 import Data.Eq((==))
 import Data.Int(Int)
 import Data.Map.Strict(fromList,union,empty)
-import Jumpie.Types(RectInt,ImageId,ImageMap,ImageDescFile,SurfaceMap,Animation(Animation),AnimMap,AnimId)
+import Jumpie.Types(RectInt)
 import Jumpie.Geometry.Point(Point2(Point2))
 import Jumpie.Geometry.Rect(Rect(Rect))
 import Jumpie.Parsec(int,safeParseFromFile)
@@ -31,8 +36,29 @@ import Control.Category((>>>))
 import Prelude(Char)
 import Data.Tuple(fst,snd)
 import System.IO(IO)
+import Data.String
+import Data.Map.Strict(Map)
 
 data DataLine = DataLineImage (ImageId,RectInt) | DataLineAnim (AnimId,Animation)
+
+type ImageId = String
+
+type ImageMap = Map ImageId RectInt
+
+type ImageDescFile = FilePath
+
+type SurfaceData = (Surface,RectInt)
+
+type SurfaceMap = Map ImageId SurfaceData
+
+data Animation = Animation {
+  animFrameSwitch :: Int,
+  animFrames :: [ImageId]
+  }
+
+type AnimId = String
+
+type AnimMap = Map AnimId Animation
 
 -- Holt nur die Files (ohne . und ..) aus einem Verzeichnis
 getFilesInDir :: FilePath -> IO [FilePath]

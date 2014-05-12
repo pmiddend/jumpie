@@ -15,7 +15,10 @@ import Jumpie.Geometry.Point(Point2(..))
 import Jumpie.Geometry.Rect(top,center,right,left,bottom)
 import Jumpie.Geometry.Utility(clampAbs)
 import Jumpie.Maybe(ifMaybe)
-import Jumpie.Types(TimeDelta,GameState,IncomingAction(..),GameObject(..),Player(Player),playerMode,PlayerMode(..),LineSegmentReal,box,PointReal,Real,isBox,SensorLine(SensorLine),playerPosition,Box(Box),timeDelta,playerVelocity,FrameState,getTimeDelta,playerWalkSince,getCurrentTicks)
+import Jumpie.GameState(GameState)
+import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),box,isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince)
+import Jumpie.FrameState(FrameState,fsTimeDelta,fsCurrentTicks)
+import Jumpie.Types(TimeDelta,IncomingAction(..),LineSegmentReal,PointReal,Real,timeDelta)
 import Prelude(Double,(+),(-),(*),abs,signum)
 
 processGame :: FrameState -> GameState -> [IncomingAction] -> GameState
@@ -40,16 +43,16 @@ lineCollision boxes l = (getFirst . mconcat . map (First . (collides l))) boxes
         collides _ _ = Nothing
 
 data Sensors = Sensors {
-  getW :: LineSegment PointReal,
-  getFL :: LineSegment PointReal,
-  getFR :: LineSegment PointReal,
-  getCL :: LineSegment PointReal,
-  getCR :: LineSegment PointReal,
-  getWCollision :: Maybe GameObject,
-  getFLCollision :: Maybe GameObject,
-  getFRCollision :: Maybe GameObject,
-  getCLCollision :: Maybe GameObject,
-  getCRCollision :: Maybe GameObject
+  sensW :: LineSegment PointReal,
+  sensFL :: LineSegment PointReal,
+  sensFR :: LineSegment PointReal,
+  sensCL :: LineSegment PointReal,
+  sensCR :: LineSegment PointReal,
+  sensWCollision :: Maybe GameObject,
+  sensFLCollision :: Maybe GameObject,
+  sensFRCollision :: Maybe GameObject,
+  sensCLCollision :: Maybe GameObject,
+  sensCRCollision :: Maybe GameObject
   }
 
 applySensors :: [GameObject] -> PointReal -> Real -> Sensors
@@ -57,15 +60,15 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
   where boxes = filter isBox go
         wSCollision = lineCollision boxes wS
         wS = LineSegment (Point2 wSL wSY) (Point2 wSR wSY)
-        wSY = _y p + wSDev
-        wSL = _x p - gcWSSize
-        wSR = _x p + gcWSSize
-        fSLX = _x p - 9.0
-        fSRX = _x p + 9.0
-        fSYTop = _y p + gcPlayerHeight
-        fSYBottom = _y p + gcPlayerHeight + 16.0
-        cSYTop = _y p - gcPlayerHeight
-        cSYBottom = _y p - gcPlayerHeight - 16.0
+        wSY = pY p + wSDev
+        wSL = pX p - gcWSSize
+        wSR = pX p + gcWSSize
+        fSLX = pX p - 9.0
+        fSRX = pX p + 9.0
+        fSYTop = pY p + gcPlayerHeight
+        fSYBottom = pY p + gcPlayerHeight + 16.0
+        cSYTop = pY p - gcPlayerHeight
+        cSYBottom = pY p - gcPlayerHeight - 16.0
         fSL = LineSegment (Point2 fSLX fSYTop) (Point2 fSLX fSYBottom)
         fSR = LineSegment (Point2 fSRX fSYTop) (Point2 fSRX fSYBottom)
         cSL = LineSegment (Point2 fSLX cSYTop) (Point2 fSLX cSYBottom)
@@ -77,23 +80,23 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
 
 processGroundPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
 processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors,getCL sensors,getCR sensors]
+  where sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
         sensors = applySensors os (playerPosition p) 4.0
-        t = getTimeDelta fs
-        fCollision = getFLCollision sensors <|> getFRCollision sensors
+        t = fsTimeDelta fs
+        fCollision = sensFLCollision sensors <|> sensFRCollision sensors
         newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
                         then Air
                         else Ground
-        newPlayerPositionX = case getWCollision sensors of
-          Just (ObjectBox (Box r)) -> if (_x . center) r < (_x . playerPosition) p
+        newPlayerPositionX = case sensWCollision sensors of
+          Just (ObjectBox (Box r)) -> if (pX . center) r < (pX . playerPosition) p
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
-          _ -> (_x . playerPosition) p + timeDelta t * (_x . playerVelocity) p
+          _ -> (pX . playerPosition) p + timeDelta t * (pX . playerVelocity) p
         newPlayerPositionY = case fCollision of
           Just (ObjectBox (Box r)) -> top r - gcPlayerHeight
-          _ -> (_y . playerPosition) p
+          _ -> (pY . playerPosition) p
         newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
-        oldPlayerVelocityX = (_x  . playerVelocity) p
+        oldPlayerVelocityX = (pX  . playerVelocity) p
         playerAcc = if PlayerLeft `elem` ias
                     then Just $ if oldPlayerVelocityX > 0.0 then -gcDec else (-gcAcc)
                     else
@@ -103,7 +106,7 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         newPlayerVelocityX = case playerAcc of
           Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
           Nothing -> oldPlayerVelocityX - min (abs oldPlayerVelocityX) gcFrc * signum oldPlayerVelocityX
-        newPlayerVelocity = if isJust (getWCollision sensors)
+        newPlayerVelocity = if isJust (sensWCollision sensors)
                             then Point2 0.0 0.0
                             else Point2 newPlayerVelocityX newPlayerVelocityY
         np = Player {
@@ -115,16 +118,16 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
 
 processAirPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
 processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map (ObjectSensorLine . SensorLine) [getW sensors,getFL sensors,getFR sensors,getCL sensors,getCR sensors]
-        t = getTimeDelta fs
+  where sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
+        t = fsTimeDelta fs
         sensors = applySensors os (playerPosition p) 0.0
-        fCollision = getFLCollision sensors <|> getFRCollision sensors
-        cCollision = getCLCollision sensors <|> getCRCollision sensors
-        movingDownwards = (_y . playerVelocity) p >= 0.0
-        oldPlayerPositionX = (_x . playerPosition) p
-        oldPlayerPositionY = (_y . playerPosition) p
-        oldPlayerVelocityX = (_x  . playerVelocity) p
-        oldPlayerVelocityY = (_y . playerVelocity) p
+        fCollision = sensFLCollision sensors <|> sensFRCollision sensors
+        cCollision = sensCLCollision sensors <|> sensCRCollision sensors
+        movingDownwards = (pY . playerVelocity) p >= 0.0
+        oldPlayerPositionX = (pX . playerPosition) p
+        oldPlayerPositionY = (pY . playerPosition) p
+        oldPlayerVelocityX = (pX  . playerVelocity) p
+        oldPlayerVelocityY = (pY . playerVelocity) p
         playerIsAboveBox b = case b of
           (ObjectBox (Box r)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
           _ -> False
@@ -137,8 +140,8 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                     then Ground
                     else Air
           _ -> Air
-        newPlayerPositionX = case getWCollision sensors of
-          Just (ObjectBox (Box r)) -> if (_x . center) r < oldPlayerPositionX
+        newPlayerPositionX = case sensWCollision sensors of
+          Just (ObjectBox (Box r)) -> if (pX . center) r < oldPlayerPositionX
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
           _ -> oldPlayerPositionX + timeDelta t * oldPlayerVelocityX
@@ -153,7 +156,7 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                          if PlayerRight `elem` ias
                          then Just gcAir
                          else Nothing
-        newPlayerVelocityX = if isJust (getWCollision sensors)
+        newPlayerVelocityX = if isJust (sensWCollision sensors)
                              then 0.0
                              else case playerAcc of
                                Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
@@ -170,5 +173,5 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
           playerVelocity = Point2 newPlayerVelocityX newPlayerVelocityY,
-          playerWalkSince = if newPlayerMode == Ground then Just (getCurrentTicks fs) else Nothing
+          playerWalkSince = if newPlayerMode == Ground then Just (fsCurrentTicks fs) else Nothing
           }
