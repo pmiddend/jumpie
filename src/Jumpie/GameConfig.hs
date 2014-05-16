@@ -1,5 +1,6 @@
 module Jumpie.GameConfig(
   gcWSSize,
+  gcTileSize,
   gcPlayerHeight,
   gcPlayerMaxSpeed,
   gcDec,
@@ -64,6 +65,9 @@ gcFrc = gcAcc
 
 gcDec :: Real
 gcDec = 0.5
+
+gcTileSize :: Real
+gcTileSize = 40.0
 
 initialPlayer :: Player
 initialPlayer = Player {

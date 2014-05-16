@@ -16,7 +16,8 @@ module Jumpie.GameObject(
   ) where
 
 import Data.Eq(Eq)
-import Jumpie.Types(PointReal,GameTicks,RectReal)
+import Jumpie.Types(PointReal,RectReal)
+import Jumpie.Time(GameTicks)
 import Jumpie.Geometry.LineSegment(LineSegment)
 import Data.Maybe(Maybe)
 import Data.Bool(Bool(..))

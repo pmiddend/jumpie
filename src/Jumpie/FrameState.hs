@@ -5,7 +5,8 @@ module Jumpie.FrameState(
   fsKeydowns
   ) where
 
-import Jumpie.Types(GameTicks,TimeDelta,Keydowns)
+import Jumpie.Types(Keydowns)
+import Jumpie.Time(GameTicks,TimeDelta)
 
 data FrameState = FrameState {
   fsCurrentTicks :: !GameTicks,

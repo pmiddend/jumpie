@@ -18,7 +18,8 @@ import Jumpie.Maybe(ifMaybe)
 import Jumpie.GameState(GameState)
 import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),box,isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince)
 import Jumpie.FrameState(FrameState,fsTimeDelta,fsCurrentTicks)
-import Jumpie.Types(TimeDelta,IncomingAction(..),LineSegmentReal,PointReal,Real,timeDelta)
+import Jumpie.Types(IncomingAction(..),LineSegmentReal,PointReal,Real)
+import Jumpie.Time(TimeDelta,timeDelta)
 import Prelude(Double,(+),(-),(*),abs,signum)
 
 processGame :: FrameState -> GameState -> [IncomingAction] -> GameState

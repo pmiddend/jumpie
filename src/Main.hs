@@ -1,13 +1,13 @@
 module Main where
 
 import Control.Applicative((*>),pure)
-import Control.Monad(return,unless)
+import Control.Monad(unless)
 import Data.Bool(Bool(..))
 import Data.Function(($),(.))
-import Data.List(any,map,(\\),union,filter,concatMap)
-import Data.Word(Word64)
+import Data.List(any,map,(\\),union,filter,concatMap,take)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
+import System.Random(getStdGen)
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
 import Graphics.UI.SDL.Keysym(SDLKey(..))
@@ -21,11 +21,14 @@ import Jumpie.SDLHelper(pollEvents)
 import Jumpie.GameData(GameData(GameData),gdScreen)
 import Jumpie.GameState(GameState)
 import Jumpie.FrameState(FrameState(FrameState),fsTimeDelta,fsKeydowns,fsCurrentTicks)
-import Jumpie.Types(IncomingAction(..),TimeDelta(TimeDelta),tickValue,GameTicks(GameTicks),Keydowns)
+import Jumpie.Types(IncomingAction(..),Keydowns)
+import Jumpie.Geometry.Rect(Rect(Rect))
+import Jumpie.Geometry.Point(Point2(Point2))
+import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
+import Jumpie.Level(randomPlatforms,validPlatforms)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
-import System.Clock(Clock(Monotonic),getTime,TimeSpec(TimeSpec))
 import System.FilePath
-import System.IO(IO)
+import System.IO(IO,print)
 import Jumpie.Render(renderGame)
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
@@ -79,14 +82,11 @@ outerGameOver events = any outerGameOver' events
         outerGameOver' (KeyDown Keysym {symKey = SDLK_ESCAPE}) = True
         outerGameOver' _ = False
 
-getTicks :: IO GameTicks
-getTicks = do
-  (TimeSpec s ns) <- getTime Monotonic
-  return $ GameTicks $ ((fromIntegral s :: Word64) * 1000 * 1000 * 1000) + fromIntegral ns
-
 main :: IO ()
 main = withInit [InitEverything] $ do
     screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
+    g <- getStdGen
+    print $ take 1 $ validPlatforms $ (take 100 $ randomPlatforms g (Rect (Point2 0 0) (Point2 20 15)))
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
