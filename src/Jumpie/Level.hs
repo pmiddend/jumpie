@@ -21,22 +21,16 @@ import Data.Eq((==))
 import Data.Function((.),($))
 import Data.Tuple(uncurry)
 import Prelude((*),sqrt,(-),(/),(+),fromIntegral,otherwise)
-import Data.List(or,(!!),take,drop,(++),replicate,intersperse,concat,unlines)
+import Data.List(or,(!!),(++),replicate,intersperse,unlines)
 import Data.Int(Int)
 import Data.String(String)
-import Data.Ord(Ord,(<=),(>=),(<),min)
+import Data.Ord(Ord,(<=),(>=),min)
 import Control.Applicative((<*>),pure,(<$>))
 import Data.Functor(fmap)
 import Text.Show(Show,show)
+import Jumpie.List(setPartList,replaceNth)
 
 data Platform = Platform PointInt PointInt deriving(Show)
-
-setPartList :: [a] -> (Int,Int) -> a -> [a]
-setPartList xs (from,to) e | to < from = setPartList xs (to,from) e
-                           | otherwise = (take from xs) ++ (replicate (to - from) e) ++ (drop to xs)
-
-replaceNth :: [a] -> Int -> a -> [a]
-replaceNth xs i e = setPartList xs (i,i+1) e
 
 showPlatforms :: RectInt -> [Platform] -> [String]
 showPlatforms r ps' = showPlatforms' (replicate h (replicate w '0')) ps'

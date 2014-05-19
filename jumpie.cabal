@@ -19,5 +19,26 @@ executable jumpie
   main-is:             Main.hs
   -- other-modules:
   hs-source-dirs:      src
-  build-depends:       base == 4.6.* || == 4.7.*, SDL == 0.6.5, SDL-image == 0.6.1, clock == 0.4.0.1, filepath == 1.3.0.2, directory == 1.2.1.0, composition == 1.0.1.0, containers == 0.5.5.1, parsec == 3.1.5, random == 1.0.1.1
+  build-depends:       base == 4.6.* || == 4.7.*,
+                       SDL == 0.6.5,
+                       SDL-image == 0.6.1,
+                       clock == 0.4.0.1,
+                       filepath == 1.3.0.2,
+                       directory == 1.2.1.0,
+                       composition == 1.0.1.0,
+                       containers == 0.5.5.1,
+                       parsec == 3.1.5,
+                       random == 1.0.1.1,
+                       QuickCheck > 2
   ghc-options: -Wall -XNoImplicitPrelude
+
+test-suite Main
+  hs-source-dirs:      test
+  ghc-options:         -w -threaded -rtsopts -with-rtsopts=-N
+  main-is:             Main.hs
+  type:                exitcode-stdio-1.0
+  build-depends:       base == 4.6.* || == 4.7.*,
+                       QuickCheck > 2,
+                       test-framework >= 0.6,
+                       test-framework-quickcheck2 >= 0.2,
+                       test-framework-th          >= 0.2
