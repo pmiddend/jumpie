@@ -5,11 +5,12 @@ module Jumpie.Level(
   showPlatforms,
   replaceNth,
   setPartList,
+  showPlatformsPpm,
   randomPlatforms) where
 
 import System.Random(Random,randomR,RandomGen)
-import Jumpie.Debug(traceShowId)
 import Jumpie.Geometry.Point(Point2(Point2))
+import Jumpie.Debug(traceShowId)
 import Jumpie.Geometry.Rect(Rect(Rect),dimensions)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Jumpie.Types(RectInt,PointInt,LineSegmentReal,PointReal,Real)
@@ -17,14 +18,14 @@ import Jumpie.GameConfig(gcGrv,gcJmp,gcPlayerMaxSpeed,gcTileSize)
 import Data.Bool((||),Bool,(&&))
 import Control.Category((>>>))
 import Data.Eq((==))
-import Data.Function((.))
+import Data.Function((.),($))
 import Data.Tuple(uncurry)
 import Prelude((*),sqrt,(-),(/),(+),fromIntegral,otherwise)
-import Data.List(or,(!!),take,drop,(++),replicate)
+import Data.List(or,(!!),take,drop,(++),replicate,intersperse,concat,unlines)
 import Data.Int(Int)
 import Data.String(String)
-import Data.Ord(Ord,(<=),(>=),(<))
-import Control.Applicative((<*>),pure)
+import Data.Ord(Ord,(<=),(>=),(<),min)
+import Control.Applicative((<*>),pure,(<$>))
 import Data.Functor(fmap)
 import Text.Show(Show,show)
 
@@ -38,12 +39,14 @@ replaceNth :: [a] -> Int -> a -> [a]
 replaceNth xs i e = setPartList xs (i,i+1) e
 
 showPlatforms :: RectInt -> [Platform] -> [String]
-showPlatforms r ps = showPlatforms' (replicate h (replicate w '0')) ps
+showPlatforms r ps' = showPlatforms' (replicate h (replicate w '0')) ps'
   where showPlatforms' :: [String] -> [Platform] -> [String]
         showPlatforms' s ((Platform (Point2 x0 y0) (Point2 x1 _)):ps) = showPlatforms' (replaceNth s y0 (setPartList (s !! y0) (x0,x1) '1')) ps
---        showPlatforms' s ((Platform (Point2 x0 y0) (Point2 x1 _)):ps) = replaceNth s y0 (setPartList (s !! y0) (x0,x1) '1')
         showPlatforms' s [] = s
         (Point2 w h) = dimensions r
+
+showPlatformsPpm :: RectInt -> [Platform] -> String
+showPlatformsPpm r@(Rect _ (Point2 w h)) ps = unlines $ ["P1",show w ++ " " ++ show h] ++ ((intersperse ' ') <$> (showPlatforms r ps))
 
 validPlatforms :: [Platform] -> [Platform]
 validPlatforms ps' = validPlatforms' [] ps'
@@ -57,16 +60,17 @@ validPlatforms ps' = validPlatforms' [] ps'
         unreachable :: [Platform] -> Platform -> Bool
         unreachable ps p = or (pure (pReachable p) <*> ps)
 
-randomPlatform :: RandomGen r => r -> RectInt -> (Platform,r)
-randomPlatform r0 (Rect (Point2 left top) (Point2 right bottom)) =
+randomPlatform :: RandomGen r => r -> RectInt -> Int -> (Platform,r)
+randomPlatform r0 (Rect (Point2 left top) (Point2 right bottom)) maxLength =
   case randomR (left,right) r0 of
-    (pleft,r1) -> case randomR (left,right) r1 of
+    (pleft,r1) -> case randomR (pleft,min right (pleft+maxLength)) r1 of
+      -- Fehler liegt hier, das muss nicht ptop sein und unten muss nicht pright hin
       (ptop,r2) -> case randomR (top,bottom) r2 of
         (pright,r3) -> (Platform (Point2 pleft ptop) (Point2 pright ptop),r3)
 
-randomPlatforms :: RandomGen r => r -> RectInt -> [Platform]
-randomPlatforms r0 rect = p1 : (randomPlatforms r1 rect)
-  where (p1,r1) = randomPlatform r0 rect
+randomPlatforms :: RandomGen r => r -> RectInt -> Int -> [Platform]
+randomPlatforms r0 rect maxLength = (traceShowId p1) : (randomPlatforms r1 rect maxLength)
+  where (p1,r1) = randomPlatform r0 rect maxLength
 
 -- Schneiden sich zwei Plattformen
 pIntersects :: Platform -> Platform -> Bool

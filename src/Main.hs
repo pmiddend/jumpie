@@ -25,10 +25,10 @@ import Jumpie.Types(IncomingAction(..),Keydowns)
 import Jumpie.Geometry.Rect(Rect(Rect))
 import Jumpie.Geometry.Point(Point2(Point2))
 import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
-import Jumpie.Level(randomPlatforms,validPlatforms)
+import Jumpie.Level(randomPlatforms,validPlatforms,showPlatformsPpm)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
-import System.IO(IO,print)
+import System.IO(IO,print,putStrLn)
 import Jumpie.Render(renderGame)
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
@@ -86,8 +86,10 @@ main :: IO ()
 main = withInit [InitEverything] $ do
     screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
     g <- getStdGen
-    print $ take 1 $ validPlatforms $ (take 100 $ randomPlatforms g (Rect (Point2 0 0) (Point2 20 15)))
+    putStrLn $ showPlatformsPpm (Rect (Point2 0 0) (Point2 21 21)) $ take 4 $ randomPlatforms g (Rect (Point2 0 0) (Point2 20 20)) 3
+    {-
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
     outerMainLoop [] (GameData images anims screen) initialGameState ticks
+    -}
