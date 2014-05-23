@@ -5,11 +5,13 @@ module Jumpie.Geometry.Intersection(
   pointInsideRect,
   lineSegmentIntersects,
   lineSegmentIntersection,
-  lineSegmentInsideRect
+  lineSegmentInsideRect,
+  parabolaPointIntersects
   ) where
 
 import Control.Applicative((<$>),(<*>),pure)
 import Jumpie.Maybe(headOrNothing)
+import Jumpie.Tuple(between)
 import Data.Bool((&&),(||),not,otherwise,Bool)
 import Data.Composition((.:))
 import Data.Function((.),($))
@@ -17,9 +19,10 @@ import Data.List(or,map,zip,zipWith,and,or)
 import Data.Maybe(Maybe(..),isJust)
 import Data.Ord((<=),(>=),(>),(<),Ord)
 import Jumpie.Geometry.LineSegment(LineSegment(..),pointList)
-import Jumpie.Geometry.Point(Point2,vmult,cross,dot,toList)
+import Jumpie.Geometry.Parabola(Parabola,paraZenith,paraBounds)
+import Jumpie.Geometry.Point(Point2,vmult,cross,dot,toList,pY,pX)
 import Jumpie.Geometry.Rect(Rect,inside,lineSegments,rectTopLeft,rectBottomRight)
-import Prelude(Num,(+),(*),(-),(/),negate,abs,signum,fromInteger,Double,Fractional)
+import Prelude(Num,(+),(*),(-),(/),negate,abs,signum,fromInteger,Double,Fractional,Floating)
 
 lineSegmentIntersects :: (Num a,Fractional a,Ord a) => a -> LineSegment (Point2 a) -> LineSegment (Point2 a) -> Bool
 lineSegmentIntersects delta l1 l2 = isJust $ lineSegmentIntersection delta l1 l2
@@ -46,9 +49,9 @@ rectIntersects :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> Rect (Po
 rectIntersects delta a b = a `inside` b || b `inside` a || or (isJust .: lineSegmentIntersection delta <$> lineSegments a <*> lineSegments b)
 
 pointInsideRect :: Ord a => Rect (Point2 a) -> Point2 a -> Bool
-pointInsideRect r p = and $ zipWith between (zip (toList . rectTopLeft $ r) (toList . rectBottomRight $ r)) (toList p)
-  where between :: Ord a => (a,a) -> a -> Bool
-        between (left,right) a = a >= left && a < right
+pointInsideRect r p = and $ zipWith betweenRE (zip (toList . rectTopLeft $ r) (toList . rectBottomRight $ r)) (toList p)
+  where betweenRE :: Ord a => (a,a) -> a -> Bool
+        betweenRE (left,right) a = a >= left && a < right
 
 rectLineSegmentIntersection :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> LineSegment (Point2 a) -> Maybe (Point2 a)
 rectLineSegmentIntersection delta rect line = headOrNothing (pure (lineSegmentIntersection delta line) <*> lineSegments rect)
@@ -61,3 +64,6 @@ rectLineSegmentIntersects delta rect line = or (pure (lineSegmentIntersects delt
 
 lineSegmentInsideRect :: Ord a => LineSegment (Point2 a) -> Rect (Point2 a) -> Bool
 lineSegmentInsideRect line r = and (map (pointInsideRect r) (pointList line))
+
+parabolaPointIntersects :: (Ord a,Floating a) => Parabola a -> Point2 a -> Bool
+parabolaPointIntersects para p = pY p < paraZenith para && pX p `between` (paraBounds para (pY p))

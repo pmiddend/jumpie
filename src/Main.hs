@@ -4,7 +4,7 @@ import Control.Applicative((*>),pure)
 import Control.Monad(unless)
 import Data.Bool(Bool(..))
 import Data.Function(($),(.))
-import Data.List(any,map,(\\),union,filter,concatMap,take)
+import Data.List(any,map,(\\),union,filter,concatMap,take,length)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
 import System.Random(getStdGen)
@@ -86,7 +86,14 @@ main :: IO ()
 main = withInit [InitEverything] $ do
     screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
     g <- getStdGen
-    putStrLn $ showPlatformsPpm (Rect (Point2 0 0) (Point2 21 21)) $ take 4 $ randomPlatforms g (Rect (Point2 0 0) (Point2 20 20)) 3
+    -- Randomplatforms
+    let boundingRect = (Rect (Point2 0 0) (Point2 21 21))
+    let randomPlats = take 10000 $ randomPlatforms g (Rect (Point2 0 0) (Point2 20 20)) 5
+    -- Valid platforms
+    putStrLn $ showPlatformsPpm boundingRect $ take 10 $ randomPlats
+    let validPlats = validPlatforms randomPlats
+    print $ length validPlats
+    putStrLn $ showPlatformsPpm boundingRect $ take 10 $ validPlats
     {-
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
