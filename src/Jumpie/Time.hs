@@ -13,10 +13,11 @@ import System.Clock(Clock(Monotonic),getTime,TimeSpec(TimeSpec))
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import Control.Monad(return)
 import Data.Function(($))
+import Text.Show(Show)
 
-newtype TimeDelta = TimeDelta { timeDelta :: Double }
+newtype TimeDelta = TimeDelta { timeDelta :: Double } deriving(Show)
 
-newtype GameTicks = GameTicks { tickValue :: Word64 }
+newtype GameTicks = GameTicks { tickValue :: Word64 } deriving(Show)
 
 getTicks :: IO GameTicks
 getTicks = do

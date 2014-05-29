@@ -23,17 +23,18 @@ import Jumpie.Time(GameTicks)
 import Jumpie.Geometry.LineSegment(LineSegment)
 import Data.Maybe(Maybe)
 import Data.Bool(Bool(..))
+import Text.Show(Show)
 
-data PlayerMode = Ground | Air deriving(Eq)
+data PlayerMode = Ground | Air deriving(Eq,Show)
 
 data Player = Player {
   playerPosition :: PointReal,
   playerMode :: PlayerMode,
   playerVelocity :: PointReal,
   playerWalkSince :: Maybe GameTicks
-  }
+  } deriving(Show)
 
-data GameObject = ObjectPlayer Player | ObjectBox Box | ObjectSensorLine SensorLine
+data GameObject = ObjectPlayer Player | ObjectBox Box | ObjectSensorLine SensorLine deriving(Show)
 
 isBox :: GameObject -> Bool
 isBox (ObjectBox _) = True
@@ -47,8 +48,8 @@ isSensorLine :: GameObject -> Bool
 isSensorLine (ObjectSensorLine _) = True
 isSensorLine _ = False
 
-data BoxType = BoxLeft | BoxRight | BoxSingleton | BoxMiddle
+data BoxType = BoxLeft | BoxRight | BoxSingleton | BoxMiddle deriving(Show)
 
-data Box = Box { boxPosition :: RectReal,boxType :: BoxType }
+data Box = Box { boxPosition :: RectReal,boxType :: BoxType } deriving(Show)
 
-newtype SensorLine = SensorLine { line :: LineSegment PointReal }
+newtype SensorLine = SensorLine { line :: LineSegment PointReal } deriving(Show)

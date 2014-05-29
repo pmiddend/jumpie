@@ -4,12 +4,14 @@ module Jumpie.GameGeneration(
   generateGame
   ) where
 
-import Jumpie.GameConfig(screenWidth, screenHeight,gcTileSize,gcPlatCount,gcPlatMaxLength)
+import Jumpie.GameConfig(screenWidth, screenHeight,gcTileSize,gcPlatCount,gcPlatMaxLength,gcPlayerHeight)
 import Jumpie.GameObject(Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..),BoxType(..))
-import Jumpie.Geometry.Point(Point2(Point2),pointToTuple)
+import Jumpie.Geometry.Point(Point2(Point2),pointToTuple,pX,pY)
 import Jumpie.Geometry.Rect(Rect(Rect),rectBottomRight,rectTopLeft,rectToTuple)
 import Jumpie.Types(RectInt,PointInt)
+import Jumpie.Random(randomElem)
 import Jumpie.Tuple(both)
+import Data.Tuple(fst)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
 import Data.Function(($),(.))
 import Control.Applicative((<$>))
@@ -54,7 +56,7 @@ generateRandomPlats g = randomPlatforms g tilesRect gcPlatMaxLength
 platToBoxes :: [PointInt] -> Platform -> [Box]
 platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
   where toBox x = Box (bpos x) (btype x)
-        bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (Point2 x y) (Point2 (x+1) y))
+        bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (Point2 x y) (Point2 (x+1) (y+1)))
         btype x = if hasLeft && hasRight
                   then BoxMiddle
                   else
@@ -68,6 +70,14 @@ platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
                 hasRight = (Point2 (x+1) y) `elem` plats
 
 generateGame :: RandomGen g => g -> [GameObject]
---generateGame g = ObjectPlayer initialPlayer : (ObjectBox <$> initialBoxes)
-generateGame g = map ObjectBox $ concatMap (platToBoxes (platsToPoints plats)) plats
+generateGame g = (ObjectPlayer $ player) : (ObjectBox <$> boxes)
   where plats = take gcPlatCount $ validPlatforms easyParabolas (generateRandomPlats g)
+        boxes = concatMap (platToBoxes platformPoints) plats
+        platformPoints = platsToPoints plats
+        randomPoint = randomElem g platformPoints
+        player = Player {
+          playerPosition = Point2 (fromIntegral $ gcTileSize * pX randomPoint) (fromIntegral (gcTileSize * (pY randomPoint + 1)) + gcPlayerHeight),
+          playerMode = Air,
+          playerVelocity = Point2 0.0 0.0,
+          playerWalkSince = Nothing
+          }
