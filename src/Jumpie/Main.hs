@@ -1,7 +1,7 @@
 module Main where
 
 import Control.Monad(unless,(>>),return)
-import Data.Bool(Bool(..))
+import Data.Bool(Bool(..),(||))
 import Data.Function(($),(.))
 import Data.List(any,map,(\\),union,filter,concatMap)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
@@ -18,7 +18,7 @@ import Jumpie.GameConfig(gcTimeMultiplier,screenWidth,screenHeight,screenBpp,med
 import Jumpie.ImageData(readAllDescFiles)
 import Jumpie.SDLHelper(pollEvents)
 import Jumpie.GameData(GameData(GameData),gdScreen)
-import Jumpie.GameState(GameState)
+import Jumpie.GameState(GameState(GameState),gsObjects,gsGameover)
 import Jumpie.FrameState(FrameState(FrameState),fsTimeDelta,fsKeydowns,fsCurrentTicks)
 import Jumpie.Types(IncomingAction(..),Keydowns)
 import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
@@ -47,7 +47,7 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
   events <- pollEvents
   newTicks <- getTicks
   unless
-    (outerGameOver events) $ do
+    (outerGameOver events || gsGameover gameState) $ do
       let tickDiff = fromIntegral (tickValue newTicks - tickValue oldTicks) / (1000.0 * 1000.0 * 1000.0) :: Double
       let newKeyDowns = processKeydowns oldKeydowns events
       let frameState = FrameState {
@@ -97,4 +97,4 @@ main = withInit [InitEverything] $ do
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
-    outerMainLoop [] (GameData images anims screen) (generateGame g) ticks
+    outerMainLoop [] (GameData images anims screen) (GameState (generateGame g) False) ticks

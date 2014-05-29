@@ -1,30 +1,36 @@
 module Jumpie.Game(processGame) where
 
 import Control.Applicative((<|>))
-import Data.Bool((&&),(||),not,Bool(False))
+import Data.Bool((&&),(||),not,Bool(False,True))
 import Data.Eq((==))
 import Data.Function((.),($))
-import Data.List(concatMap,map,filter,(++),elem)
+import Data.List(concatMap,map,filter,(++),elem,find)
 import Data.Maybe(Maybe(..),isNothing,isJust,fromJust)
 import Data.Monoid(First(First),getFirst,mconcat)
 import Data.Ord((<),(>=),(>),min)
-import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir,gcJmp)
-import Jumpie.Debug(traceShowId)
+import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir,gcJmp,screenHeight)
 import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Jumpie.Geometry.Point(Point2(..))
 import Jumpie.Geometry.Rect(top,center,right,left,bottom)
 import Jumpie.Geometry.Utility(clampAbs)
 import Jumpie.Maybe(ifMaybe)
-import Jumpie.GameState(GameState)
-import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince,boxPosition)
+import Jumpie.GameState(GameState(GameState),gsObjects)
+import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince,boxPosition,isPlayer)
 import Jumpie.FrameState(FrameState,fsTimeDelta,fsCurrentTicks)
 import Jumpie.Types(IncomingAction(..),LineSegmentReal,PointReal,Real)
 import Jumpie.Time(TimeDelta,timeDelta)
-import Prelude(Double,(+),(-),(*),abs,signum)
+import Prelude(Double,(+),(-),(*),abs,signum,fromIntegral)
 
 processGame :: FrameState -> GameState -> [IncomingAction] -> GameState
-processGame fs gameObjects actions = concatMap (processGameObject fs gameObjects actions) gameObjects
+processGame fs gs actions = GameState newGameObjects (testGameOver newGameObjects)
+  where newGameObjects = concatMap (processGameObject fs (gsObjects gs) actions) (gsObjects gs)
+
+testGameOver :: [GameObject] -> Bool
+testGameOver os = case find isPlayer os of
+  Nothing -> True
+  Just (ObjectPlayer p) -> (pY . playerPosition) p > fromIntegral screenHeight
+  Just _ -> True
 
 processGameObject :: FrameState -> [GameObject] -> [IncomingAction] -> GameObject -> [GameObject]
 processGameObject fs os ias o = case o of

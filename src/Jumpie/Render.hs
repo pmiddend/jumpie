@@ -20,7 +20,7 @@ import Jumpie.Geometry.Rect(rectTopLeft,dimensions)
 import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham)
 import Jumpie.GameData(gdSurfaces,gdScreen,gdAnims,GameData)
 import Jumpie.GameObject(playerPosition,Box(Box),GameObject(..),SensorLine(SensorLine),Player,playerMode,PlayerMode(..),playerWalkSince,playerVelocity,BoxType(..))
-import Jumpie.GameState(GameState)
+import Jumpie.GameState(GameState,gsObjects)
 import Jumpie.FrameState(FrameState,fsCurrentTicks)
 import Jumpie.Types(PointReal)
 import Jumpie.Time(tickValue,GameTicks)
@@ -32,7 +32,7 @@ fillScreen :: GameData -> (Word8,Word8,Word8) -> IO ()
 fillScreen gd color = fillSurface (gdScreen gd) color
 
 renderGame :: GameData -> FrameState -> GameState -> IO ()
-renderGame gd fs go = fillScreen gd backgroundColor *> traverse_ (renderObject gd fs) go
+renderGame gd fs gs = fillScreen gd backgroundColor *> traverse_ (renderObject gd fs) (gsObjects gs)
 
 renderObject :: GameData -> FrameState -> GameObject -> IO ()
 renderObject gd fs ob = case ob of
