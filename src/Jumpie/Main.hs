@@ -1,14 +1,12 @@
 module Main where
 
-import Control.Applicative((*>),pure)
-import Control.Monad(unless)
+import Control.Monad(unless,(>>),return)
 import Data.Bool(Bool(..))
 import Data.Function(($),(.))
-import Data.List(any,map,(\\),union,filter,concatMap,take,length,(++))
+import Data.List(any,map,(\\),union,filter,concatMap)
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
 import System.Random(getStdGen)
-import Text.Show(show)
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
 import Graphics.UI.SDL.Keysym(SDLKey(..))
@@ -23,18 +21,15 @@ import Jumpie.GameData(GameData(GameData),gdScreen)
 import Jumpie.GameState(GameState)
 import Jumpie.FrameState(FrameState(FrameState),fsTimeDelta,fsKeydowns,fsCurrentTicks)
 import Jumpie.Types(IncomingAction(..),Keydowns)
-import Jumpie.Geometry.Rect(Rect(Rect))
-import Jumpie.Geometry.Point(Point2(Point2))
 import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
-import Jumpie.LevelGeneration(randomPlatforms,validPlatforms,showPlatformsPpm)
 import Jumpie.GameGeneration(generateGame)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
-import System.IO(IO,putStrLn)
+import System.IO(IO)
 import Jumpie.Render(renderGame)
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
-mainLoop _ gameData gameState frameState = renderGame gameData frameState newState *> pure newState
+mainLoop _ gameData gameState frameState = renderGame gameData frameState newState >> return newState
   where newState = processGame frameState gameState incomingActions
         incomingActions = concatMap kdToAction (fsKeydowns frameState)
 

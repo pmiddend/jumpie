@@ -4,26 +4,22 @@ module Jumpie.GameGeneration(
   generateGame
   ) where
 
-import Jumpie.GameConfig(screenWidth, screenHeight,gcTileSize,gcPlatCount,gcPlatMaxLength,gcPlayerHeight)
+import Jumpie.GameConfig(screenWidth, screenHeight,gcTileSize,gcPlatCount,gcPlatMaxLength)
 import Jumpie.GameObject(Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..),BoxType(..))
-import Jumpie.Geometry.Point(Point2(Point2),pointToTuple,pX,pY)
-import Jumpie.Geometry.Rect(Rect(Rect),rectBottomRight,rectTopLeft,rectToTuple)
+import Jumpie.Geometry.Point(Point2(Point2),pX,pY)
+import Jumpie.Geometry.Rect(Rect(Rect))
 import Jumpie.Types(RectInt,PointInt)
 import Jumpie.Random(randomElem)
 import Jumpie.Debug(traceShowId)
-import Jumpie.Tuple(both)
-import Data.Tuple(fst)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
 import Data.Function(($),(.))
 import Control.Applicative((<$>))
 import Data.Functor(fmap)
 import Data.Maybe(Maybe(Nothing))
-import Data.List(map,(++),take,concatMap,elem)
+import Data.List(map,take,concatMap,elem)
 import System.Random(RandomGen)
-import Data.Int(Int)
-import Data.Bool(Bool(True),(&&))
+import Data.Bool((&&))
 import Jumpie.LevelGeneration(Platform(Platform),randomPlatforms,validPlatforms,easyParabolas,pTiles)
-import Data.Array(array,Array)
 
   {-
 initialPlayer :: Player
@@ -77,7 +73,7 @@ generateGame g = (ObjectPlayer $ player) : (ObjectBox <$> boxes)
         platformPoints = platsToPoints plats
         randomPoint = randomElem g platformPoints
         player = Player {
-          playerPosition = traceShowId $ Point2 (fromIntegral $ gcTileSize * pX randomPoint + gcTileSize `div` 2) (fromIntegral (gcTileSize * (pY randomPoint + 1)) - 2.0 * fromIntegral gcTileSize),
+          playerPosition = Point2 (fromIntegral $ gcTileSize * pX randomPoint + gcTileSize `div` 2) (fromIntegral (gcTileSize * (pY randomPoint + 1)) - 2.0 * fromIntegral gcTileSize),
           playerMode = Air,
           playerVelocity = Point2 0.0 0.0,
           playerWalkSince = Nothing
