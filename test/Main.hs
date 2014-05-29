@@ -14,7 +14,7 @@ import Test.Framework.TH
 import Test.Framework.Providers.QuickCheck2
 import Jumpie.Geometry.Point(Point2(Point2),pX,pY)
 import Jumpie.Geometry.Rect(Rect(Rect),rectTopLeft,rectBottomRight)
-import Jumpie.List(setPartList,replaceNth)
+import Jumpie.List(setPartList,replaceNth,orEmptyTrue)
 import Jumpie.Level(randomPlatform,Platform(Platform))
 import Control.Applicative((<$>),(<*>))
 import System.Random(mkStdGen)
@@ -40,6 +40,14 @@ prop_replaceNth_preserve xs i e = length xs /= 0 && i > 0 && i < length xs ==> (
 
 prop_replaceNth_idem xs i e = i >= 0 && i < length xs ==> r == (replaceNth r i e)
   where r = replaceNth xs i e
+
+prop_setPartList_begin xs i j e = i >= 0 && j > i && j < length xs ==> (setPartList xs (i,j) e) !! i == e
+prop_setPartList_end xs i j e = i >= 0 && j > i && j < length xs ==> (setPartList xs (i,j) e) !! j == e
+
+prop_setPartList_idem xs i j e = i >= 0 && j > i && j < length xs ==> r == setPartList r (i,j) e
+  where r = setPartList xs (i,j) e
+
+prop_orEmptyTrue xs = not (null xs) ==> orEmptyTrue xs == or xs
 
 main :: IO ()
 main = $defaultMainGenerator

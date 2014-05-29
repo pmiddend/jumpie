@@ -13,8 +13,13 @@ import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger)
 import Data.Functor(fmap,Functor)
 import Control.Applicative(Applicative,(<*>),pure,liftA2)
 import Text.Show(Show)
+import Data.Eq(Eq,(==))
+import Data.Bool((&&))
 
 data Point2 a = Point2 { pX :: a, pY :: a } deriving(Show)
+
+instance Eq a => Eq (Point2 a) where
+  (Point2 a0 b0) == (Point2 a1 b1) = a0 == a1 && b0 == b1
 
 instance Functor Point2 where
   fmap f (Point2 a b) = Point2 (f a) (f b)

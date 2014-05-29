@@ -4,10 +4,11 @@ import Control.Applicative((*>),pure)
 import Control.Monad(unless)
 import Data.Bool(Bool(..))
 import Data.Function(($),(.))
-import Data.List(any,map,(\\),union,filter,concatMap,take,length)
+import Data.List(any,map,(\\),union,filter,concatMap,take,length,(++))
 import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
 import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
 import System.Random(getStdGen)
+import Text.Show(show)
 import Graphics.UI.SDL.Image(load)
 import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
 import Graphics.UI.SDL.Keysym(SDLKey(..))
@@ -28,7 +29,7 @@ import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
 import Jumpie.Level(randomPlatforms,validPlatforms,showPlatformsPpm)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
-import System.IO(IO,print,putStrLn)
+import System.IO(IO,putStrLn)
 import Jumpie.Render(renderGame)
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
@@ -88,15 +89,14 @@ main = withInit [InitEverything] $ do
     g <- getStdGen
     -- Randomplatforms
     let boundingRect = (Rect (Point2 0 0) (Point2 21 21))
-    let randomPlats = take 10000 $ randomPlatforms g (Rect (Point2 0 0) (Point2 20 20)) 5
+    let randomPlats = randomPlatforms g (Rect (Point2 0 0) (Point2 20 20)) 5
     -- Valid platforms
-    putStrLn $ showPlatformsPpm boundingRect $ take 10 $ randomPlats
-    let validPlats = validPlatforms randomPlats
-    print $ length validPlats
-    putStrLn $ showPlatformsPpm boundingRect $ take 10 $ validPlats
-    {-
+    --putStrLn $ showPlatformsPpm boundingRect $ randomPlats
+    let validPlats = take 20 $ validPlatforms randomPlats
+    putStrLn $ "Number of plats: " ++ (show (length validPlats))
+    putStrLn $ "Plats: " ++ (show validPlats)
+    putStrLn $ showPlatformsPpm boundingRect $ validPlats
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
     outerMainLoop [] (GameData images anims screen) initialGameState ticks
-    -}
