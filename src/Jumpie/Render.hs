@@ -14,11 +14,12 @@ import Data.Map.Strict((!))
 import Data.Word(Word8)
 import Data.Ord((<=))
 import Jumpie.Geometry.LineSegment(LineSegment)
+import Data.String(String)
 import Jumpie.Geometry.Point(Point2(..),vmult)
 import Jumpie.Geometry.Rect(rectTopLeft,dimensions)
 import Jumpie.SDLHelper(blitAtPosition,fillSurface,surfaceBresenham)
 import Jumpie.GameData(gdSurfaces,gdScreen,gdAnims,GameData)
-import Jumpie.GameObject(playerPosition,Box(Box),GameObject(..),SensorLine(SensorLine),Player,playerMode,PlayerMode(..),playerWalkSince,playerVelocity)
+import Jumpie.GameObject(playerPosition,Box(Box),GameObject(..),SensorLine(SensorLine),Player,playerMode,PlayerMode(..),playerWalkSince,playerVelocity,BoxType(..))
 import Jumpie.GameState(GameState)
 import Jumpie.FrameState(FrameState,fsCurrentTicks)
 import Jumpie.Types(PointReal)
@@ -37,7 +38,13 @@ renderObject :: GameData -> FrameState -> GameObject -> IO ()
 renderObject gd fs ob = case ob of
   ObjectPlayer p -> renderPlayer gd fs p
   ObjectSensorLine (SensorLine s) -> surfaceBresenham (gdScreen gd) (255,0,0) (toIntLine s)
-  ObjectBox (Box b) -> blitAt gd "platform" (rectTopLeft b)
+  ObjectBox (Box p t) -> blitAt gd ("platform" ++ boxTypeToSuffix t) (rectTopLeft p)
+
+boxTypeToSuffix :: BoxType -> String
+boxTypeToSuffix BoxMiddle = "m"
+boxTypeToSuffix BoxLeft = "l"
+boxTypeToSuffix BoxRight = "r"
+boxTypeToSuffix BoxSingleton = "s"
 
 tickDiffSecs :: GameTicks -> GameTicks -> Double
 tickDiffSecs a b = fromIntegral (tickValue a - tickValue b) / (1000.0 * 1000.0 * 1000.0)

@@ -20,7 +20,7 @@ import Data.Maybe(Maybe(..),isJust)
 import Data.Ord((<=),(>=),(>),(<),Ord)
 import Jumpie.Geometry.LineSegment(LineSegment(..),pointList)
 import Jumpie.Geometry.Parabola(Parabola,paraZenith,paraBounds)
-import Jumpie.Geometry.Point(Point2,vmult,cross,dot,toList,pY,pX)
+import Jumpie.Geometry.Point(Point2,vmult,cross,dot,pointToList,pY,pX)
 import Jumpie.Geometry.Rect(Rect,inside,lineSegments,rectTopLeft,rectBottomRight)
 import Prelude(Num,(+),(*),(-),(/),negate,abs,signum,fromInteger,Double,Fractional,Floating)
 
@@ -49,7 +49,7 @@ rectIntersects :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> Rect (Po
 rectIntersects delta a b = a `inside` b || b `inside` a || or (isJust .: lineSegmentIntersection delta <$> lineSegments a <*> lineSegments b)
 
 pointInsideRect :: Ord a => Rect (Point2 a) -> Point2 a -> Bool
-pointInsideRect r p = and $ zipWith betweenRE (zip (toList . rectTopLeft $ r) (toList . rectBottomRight $ r)) (toList p)
+pointInsideRect r p = and $ zipWith betweenRE (zip (pointToList . rectTopLeft $ r) (pointToList . rectBottomRight $ r)) (pointToList p)
   where betweenRE :: Ord a => (a,a) -> a -> Bool
         betweenRE (left,right) a = a >= left && a < right
 

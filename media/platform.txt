@@ -1,1 +1,4 @@
-platform=0,0,35,35
+platformm=0,0,35,35
+platforml=36,0,71,35
+platformr=72,0,107,35
+platforms=108,0,143,35

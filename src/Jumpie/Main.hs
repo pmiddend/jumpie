@@ -17,7 +17,6 @@ import Graphics.UI.SDL.Video(setVideoMode)
 import Graphics.UI.SDL.WindowManagement(setCaption)
 import Jumpie.Game(processGame)
 import Jumpie.GameConfig(gcTimeMultiplier,screenWidth,screenHeight,screenBpp,mediaDir)
-import Jumpie.GameGeneration(generateGame)
 import Jumpie.ImageData(readAllDescFiles)
 import Jumpie.SDLHelper(pollEvents)
 import Jumpie.GameData(GameData(GameData),gdScreen)
@@ -27,7 +26,8 @@ import Jumpie.Types(IncomingAction(..),Keydowns)
 import Jumpie.Geometry.Rect(Rect(Rect))
 import Jumpie.Geometry.Point(Point2(Point2))
 import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
-import Jumpie.Level(randomPlatforms,validPlatforms,showPlatformsPpm)
+import Jumpie.LevelGeneration(randomPlatforms,validPlatforms,showPlatformsPpm)
+import Jumpie.GameGeneration(generateGame)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
 import System.IO(IO,putStrLn)
@@ -102,4 +102,4 @@ main = withInit [InitEverything] $ do
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
-    outerMainLoop [] (GameData images anims screen) (generateGameState g) ticks
+    outerMainLoop [] (GameData images anims screen) (generateGame g) ticks

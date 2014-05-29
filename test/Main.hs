@@ -15,7 +15,7 @@ import Test.Framework.Providers.QuickCheck2
 import Jumpie.Geometry.Point(Point2(Point2),pX,pY)
 import Jumpie.Geometry.Rect(Rect(Rect),rectTopLeft,rectBottomRight)
 import Jumpie.List(setPartList,replaceNth,orEmptyTrue)
-import Jumpie.Level(randomPlatform,Platform(Platform))
+import Jumpie.LevelGeneration(randomPlatform,Platform(Platform))
 import Control.Applicative((<$>),(<*>))
 import System.Random(mkStdGen)
 

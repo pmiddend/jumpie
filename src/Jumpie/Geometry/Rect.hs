@@ -9,10 +9,11 @@ module Jumpie.Geometry.Rect(
   top,
   bottom,
   left,
-  right
+  right,
+  rectToTuple
   ) where
 
-import Jumpie.Geometry.Point(Point2(Point2),pX,pY,toList,vmult)
+import Jumpie.Geometry.Point(Point2(Point2),pX,pY,pointToList,vmult)
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Data.Ord(Ord,(>=),(<=))
 import Prelude((-),Num,Fractional,(+))
@@ -26,7 +27,7 @@ instance Functor Rect where
   fmap f (Rect a b) = Rect (f a) (f b)
 
 inside :: Ord a => Rect (Point2 a) -> Rect (Point2 a) -> Bool
-inside (Rect tlsmall brsmall) (Rect tlbig brbig) = (toList tlsmall >= toList tlbig) && (toList brsmall <= toList brbig)
+inside (Rect tlsmall brsmall) (Rect tlbig brbig) = (pointToList tlsmall >= pointToList tlbig) && (pointToList brsmall <= pointToList brbig)
 
 lineSegments :: Rect (Point2 a) -> [LineSegment (Point2 a)]
 lineSegments (Rect tl br) = [
@@ -50,3 +51,6 @@ top (Rect (Point2 _ a) _) = a
 left (Rect (Point2 a _) _) = a
 bottom (Rect _ (Point2 _ a)) = a
 right (Rect _ (Point2 a _)) = a
+
+rectToTuple :: Rect (Point2 a) -> (Point2 a,Point2 a)
+rectToTuple (Rect a b) = (a,b)

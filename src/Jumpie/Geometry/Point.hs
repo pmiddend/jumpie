@@ -5,9 +5,9 @@ module Jumpie.Geometry.Point(
   cross,
   dot,
   vmult,
-  fromTuple,
-  toTuple,
-  toList) where
+  pointFromTuple,
+  pointToTuple,
+  pointToList) where
 
 import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger)
 import Data.Functor(fmap,Functor)
@@ -46,11 +46,11 @@ dot (Point2 x1 y1) (Point2 x2 y2) = x1 * x2 + y1 * y2
 vmult :: Num a => a -> Point2 a -> Point2 a
 vmult s p = fmap (s *) p
 
-toTuple :: Point2 a -> (a,a)
-toTuple (Point2 x y) = (x,y)
+pointToTuple :: Point2 a -> (a,a)
+pointToTuple (Point2 x y) = (x,y)
 
-fromTuple :: (a,a) -> Point2 a
-fromTuple (a,b) = Point2 a b
+pointFromTuple :: (a,a) -> Point2 a
+pointFromTuple (a,b) = Point2 a b
 
-toList :: Point2 a -> [a]
-toList (Point2 a b) = [a,b]
+pointToList :: Point2 a -> [a]
+pointToList (Point2 a b) = [a,b]

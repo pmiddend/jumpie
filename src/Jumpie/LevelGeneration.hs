@@ -1,6 +1,11 @@
-module Jumpie.Level(
+module Jumpie.LevelGeneration(
   Platform(Platform),
+  pLeft,
+  pRight,
   validPlatforms,
+  pTiles,
+  difficultParabolas,
+  easyParabolas,
   randomPlatform,
   showPlatforms,
   replaceNth,
@@ -43,17 +48,14 @@ showPlatforms r ps' = showPlatforms' (replicate h (replicate w '0')) ps'
 showPlatformsPpm :: RectInt -> [Platform] -> String
 showPlatformsPpm r@(Rect _ (Point2 w h)) ps = unlines $ ["P1",show w ++ " " ++ show h] ++ (reverse $ (intersperse ' ') <$> (showPlatforms r ps))
 
-validPlatforms :: [Platform] -> [Platform]
-validPlatforms = inductiveFilter (\x xs -> not (intersects xs x) && not (unreachable xs x))
+validPlatforms :: [Parabola Real] -> [Platform] -> [Platform]
+validPlatforms paras = inductiveFilter (\x xs -> not (intersects xs x) && not (unreachable xs x))
   where intersects :: [Platform] -> Platform -> Bool
-        --intersects ps p = trace ("intersects: " ++ show r) $ or r
         intersects ps p = or r
           where r = pure (pIntersects p) <*> ps
-        -- Obacht, or ist nicht gleich foldr (||) True sondern foldr (||) False
         unreachable :: [Platform] -> Platform -> Bool
-        --unreachable ps p = trace ("unreachable " ++ show p ++ ": " ++ show r) $ not $ orEmptyTrue $ r
         unreachable ps p = not $ orEmptyTrue $ r
-          where r = pure (pReachable p) <*> ps
+          where r = pure (pReachable paras p) <*> ps
 
 randomPlatform :: RandomGen r => r -> RectInt -> Int -> (Platform,r)
 randomPlatform r0 (Rect (Point2 left top) (Point2 right bottom)) maxLength =
@@ -77,6 +79,12 @@ pIntersects p0 p1 = r
 pTiles :: Platform -> [PointInt]
 pTiles (Platform (Point2 l0 t0) (Point2 r0 _)) = [Point2 x t0 | x <- [l0..r0]]
 
+pLeft :: Platform -> PointInt
+pLeft (Platform p _) = p
+
+pRight :: Platform -> PointInt
+pRight (Platform _ r) = r
+
 pAugTiles :: Platform -> [PointInt]
 pAugTiles (Platform (Point2 l t) (Point2 r _)) = concatMap pTiles $ makePlat <$> [(wl,wr,t-1),(wl,wr,t),(wl,wr,t+1)]
   where wl = l-1
@@ -88,23 +96,24 @@ pToLineSegment :: Platform -> LineSegmentReal
 pToLineSegment (Platform (Point2 x0 y0) (Point2 x1 _)) = (fmap . fmap) fromIntegral (LineSegment (Point2 x0 y0) (Point2 x1 y0))
 
 -- Ist Plattform A von Plattform B erreichbar
-pReachable :: Platform -> Platform -> Bool
-pReachable p0@(Platform (Point2 _ t0) _) p1@(Platform (Point2 _ t1) _) =
-  pReachable' `uncurry` (both (pToLineSegment >>> appTS) lowerPair)
+pReachable :: [Parabola Real] -> Platform -> Platform -> Bool
+pReachable paras p0@(Platform (Point2 _ t0) _) p1@(Platform (Point2 _ t1) _) =
+  pReachable' paras `uncurry` (both (pToLineSegment >>> appTS) lowerPair)
   where lowerPair = if t0 <= t1 then (p0,p1) else (p1,p0)
-        appTS = (fmap . fmap) (*gcTileSize)
+        appTS = (fmap . fmap) (*(fromIntegral gcTileSize))
 
 -- Ist Plattform A von Plattform B erreichbar (basiert auf Linien, nicht mehr auf Plattformen)
-pReachable' :: LineSegmentReal -> LineSegmentReal -> Bool
-pReachable' (LineSegment l0 r0) upper = pParabolaIntersects l0 upper || pParabolaIntersects r0 upper
+pReachable' :: [Parabola Real] -> LineSegmentReal -> LineSegmentReal -> Bool
+pReachable' paras (LineSegment l0 r0) upper = pParabolaIntersects paras l0 upper || pParabolaIntersects paras r0 upper
 
-pParabolaIntersects :: PointReal -> LineSegmentReal -> Bool
-pParabolaIntersects p (LineSegment l r) = or $ parabolaPointIntersects <$> testParabolas <*> [l - p,r - p]
+pParabolaIntersects :: [Parabola Real] -> PointReal -> LineSegmentReal -> Bool
+pParabolaIntersects paras p (LineSegment l r) = or $ parabolaPointIntersects <$> paras <*> [l - p,r - p]
 
---testParabolas :: [Parabola Real]
---testParabolas = concatMap (\f -> [playerParabola f,paraInvert (playerParabola f)]) [1.0,0.5,0.25]
-testParabolas :: [Parabola Real]
-testParabolas = concatMap (\f -> [playerParabola f,paraInvert (playerParabola f)]) [1.0]
+easyParabolas :: [Parabola Real]
+easyParabolas = concatMap (\f -> [playerParabola f,paraInvert (playerParabola f)]) [1.0,0.5,0.25]
+
+difficultParabolas :: [Parabola Real]
+difficultParabolas = concatMap (\f -> [playerParabola f,paraInvert (playerParabola f)]) [1.0]
 
 playerParabola :: Real -> Parabola Real
 playerParabola fmult = Parabola (-gcGrv/(2*f*f),-gcJmp/f,0)

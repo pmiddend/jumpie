@@ -1,6 +1,7 @@
 module Jumpie.GameObject(
   GameObject(..),
   PlayerMode(..),
+  BoxType(..),
   Player(Player),
   SensorLine(SensorLine),
   line,
@@ -9,7 +10,8 @@ module Jumpie.GameObject(
   playerVelocity,
   playerWalkSince,
   Box(Box),
-  box,
+  boxPosition,
+  boxType,
   isBox,
   isPlayer,
   isSensorLine
@@ -45,6 +47,8 @@ isSensorLine :: GameObject -> Bool
 isSensorLine (ObjectSensorLine _) = True
 isSensorLine _ = False
 
-newtype Box = Box { box :: RectReal }
+data BoxType = BoxLeft | BoxRight | BoxSingleton | BoxMiddle
+
+data Box = Box { boxPosition :: RectReal,boxType :: BoxType }
 
 newtype SensorLine = SensorLine { line :: LineSegment PointReal }

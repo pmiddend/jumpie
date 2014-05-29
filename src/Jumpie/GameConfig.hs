@@ -9,23 +9,17 @@ module Jumpie.GameConfig(
   gcAcc,
   gcJmp,
   gcFrc,
+  gcPlatCount,
+  gcPlatMaxLength,
   gcTimeMultiplier,
-  initialGameState,
   screenWidth,
   screenHeight,
   screenBpp,
   mediaDir
   ) where
 
-import Jumpie.GameObject(Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..))
 import Jumpie.Types(Real)
-import Jumpie.Geometry.Point(Point2(Point2))
-import Jumpie.Geometry.Rect(Rect(Rect),rectBottomRight,rectTopLeft)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
-import Data.Function(($))
-import Control.Applicative((<$>))
-import Data.Maybe(Maybe(Nothing))
-import Data.List(map,(++))
 import Data.Int(Int)
 import Data.String(String)
 
@@ -35,6 +29,12 @@ screenHeight = 600
 screenBpp = 32
 mediaDir :: String
 mediaDir = "media"
+
+gcPlatMaxLength :: Int
+gcPlatMaxLength = 5
+
+gcPlatCount :: Int
+gcPlatCount = 15
 
 gcWSSize :: Real
 gcWSSize = 10.0
@@ -66,27 +66,5 @@ gcFrc = gcAcc
 gcDec :: Real
 gcDec = 0.5
 
-gcTileSize :: Real
-gcTileSize = 40.0
-
-initialPlayer :: Player
-initialPlayer = Player {
-  playerPosition = Point2 (fromIntegral screenWidth / 2.0) (fromIntegral screenHeight / 4.0),
-  playerMode = Air,
-  playerVelocity = Point2 0.0 0.0,
-  playerWalkSince = Nothing
-  }
-
-initialBoxes :: [Box]
-initialBoxes = map (\x -> toBox x yBaseline) [0..boxesPerScreen-1] ++ otherBoxes
-  where rectSize = 35
-        yBaseline = fromIntegral $ screenHeight `div` 2 - rectSize `div` 2
-        boxesPerScreen = screenWidth `div` rectSize
-        otherBoxes = [toBox 2 (yBaseline - fromIntegral rectSize),toBox 10 (yBaseline - 3.0 * fromIntegral rectSize)]
-        toBox xRaw yRaw = Box $ Rect {
-          rectTopLeft = Point2 (fromIntegral (xRaw*rectSize)) yRaw,
-          rectBottomRight = Point2 (fromIntegral ((xRaw+1)*rectSize)) (yRaw + fromIntegral rectSize)
-          }
-
-initialGameState :: [GameObject]
-initialGameState = ObjectPlayer initialPlayer : (ObjectBox <$> initialBoxes)
+gcTileSize :: Int
+gcTileSize = 35

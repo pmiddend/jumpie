@@ -16,7 +16,7 @@ import Jumpie.Geometry.Rect(top,center,right,left,bottom)
 import Jumpie.Geometry.Utility(clampAbs)
 import Jumpie.Maybe(ifMaybe)
 import Jumpie.GameState(GameState)
-import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),box,isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince)
+import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince,boxPosition)
 import Jumpie.FrameState(FrameState,fsTimeDelta,fsCurrentTicks)
 import Jumpie.Types(IncomingAction(..),LineSegmentReal,PointReal,Real)
 import Jumpie.Time(TimeDelta,timeDelta)
@@ -40,7 +40,7 @@ processPlayerObject fs os ias p = case playerMode p of
 lineCollision :: [GameObject] -> LineSegmentReal -> Maybe GameObject
 lineCollision boxes l = (getFirst . mconcat . map (First . (collides l))) boxes
   where collides :: LineSegmentReal -> GameObject -> Maybe GameObject
-        collides l1 bp@(ObjectBox b) = ifMaybe (rectLineSegmentIntersects 0.01 (box b) l1) bp
+        collides l1 bp@(ObjectBox b) = ifMaybe (rectLineSegmentIntersects 0.01 (boxPosition b) l1) bp
         collides _ _ = Nothing
 
 data Sensors = Sensors {
@@ -89,12 +89,12 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                         then Air
                         else Ground
         newPlayerPositionX = case sensWCollision sensors of
-          Just (ObjectBox (Box r)) -> if (pX . center) r < (pX . playerPosition) p
+          Just (ObjectBox (Box r _)) -> if (pX . center) r < (pX . playerPosition) p
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
           _ -> (pX . playerPosition) p + timeDelta t * (pX . playerVelocity) p
         newPlayerPositionY = case fCollision of
-          Just (ObjectBox (Box r)) -> top r - gcPlayerHeight
+          Just (ObjectBox (Box r _)) -> top r - gcPlayerHeight
           _ -> (pY . playerPosition) p
         newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
         oldPlayerVelocityX = (pX  . playerVelocity) p
@@ -130,10 +130,10 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
         oldPlayerVelocityX = (pX  . playerVelocity) p
         oldPlayerVelocityY = (pY . playerVelocity) p
         playerIsAboveBox b = case b of
-          (ObjectBox (Box r)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
+          (ObjectBox (Box r _)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
           _ -> False
         playerIsBelowBox b = case b of
-          (ObjectBox (Box r)) -> oldPlayerPositionY + gcPlayerHeight > top r
+          (ObjectBox (Box r _)) -> oldPlayerPositionY + gcPlayerHeight > top r
           _ -> False
         -- Ist der naechste Zustand der Bodenzustand?
         newPlayerMode = case fCollision of
@@ -142,12 +142,12 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
                     else Air
           _ -> Air
         newPlayerPositionX = case sensWCollision sensors of
-          Just (ObjectBox (Box r)) -> if (pX . center) r < oldPlayerPositionX
+          Just (ObjectBox (Box r _)) -> if (pX . center) r < oldPlayerPositionX
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
           _ -> oldPlayerPositionX + timeDelta t * oldPlayerVelocityX
         newPlayerPositionY = case cCollision of
-          Just b@(ObjectBox (Box r)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
+          Just b@(ObjectBox (Box r _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
                                         then bottom r + gcPlayerHeight
                                         else oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
           _ -> oldPlayerPositionY + timeDelta t * oldPlayerVelocityY

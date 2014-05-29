@@ -16,7 +16,7 @@ build-type:          Simple
 cabal-version:       >=1.8
 
 executable jumpie
-  main-is:             Main.hs
+  main-is:             Jumpie/Main.hs
   -- other-modules:
   hs-source-dirs:      src
   build-depends:       base == 4.6.* || == 4.7.*,
@@ -29,7 +29,8 @@ executable jumpie
                        containers == 0.5.5.1,
                        parsec == 3.1.5,
                        random == 1.0.1.1,
-                       QuickCheck > 2
+                       QuickCheck > 2,
+                       array == 0.4.0.1
   ghc-options: -Wall -XNoImplicitPrelude
 
 test-suite Main
