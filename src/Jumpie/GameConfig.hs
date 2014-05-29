@@ -43,19 +43,24 @@ gcPlayerHeight :: Real
 gcPlayerHeight = 20.0
 
 gcGrv :: Real
+-- Sonic-Wert
 gcGrv = 0.21875
 
 gcTimeMultiplier :: Real
-gcTimeMultiplier = 30.0
+--gcTimeMultiplier = 30.0
+gcTimeMultiplier = 50.0
 
 gcPlayerMaxSpeed :: Real
 gcPlayerMaxSpeed = 6.0
 
 gcAcc :: Real
+-- Sonic-Wert
+--gcAcc = 0.046875
 gcAcc = 0.046875
 
 gcAir :: Real
-gcAir = 2.0 * gcAcc
+gcAir = gcAcc
+--gcAir = gcAcc
 
 gcJmp :: Real
 gcJmp = -6.5
