@@ -10,6 +10,7 @@ import Jumpie.Geometry.Point(Point2(Point2),pointToTuple,pX,pY)
 import Jumpie.Geometry.Rect(Rect(Rect),rectBottomRight,rectTopLeft,rectToTuple)
 import Jumpie.Types(RectInt,PointInt)
 import Jumpie.Random(randomElem)
+import Jumpie.Debug(traceShowId)
 import Jumpie.Tuple(both)
 import Data.Tuple(fst)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
@@ -76,7 +77,7 @@ generateGame g = (ObjectPlayer $ player) : (ObjectBox <$> boxes)
         platformPoints = platsToPoints plats
         randomPoint = randomElem g platformPoints
         player = Player {
-          playerPosition = Point2 (fromIntegral $ gcTileSize * pX randomPoint) (fromIntegral (gcTileSize * (pY randomPoint + 1)) + gcPlayerHeight),
+          playerPosition = traceShowId $ Point2 (fromIntegral $ gcTileSize * pX randomPoint) (fromIntegral (gcTileSize * (pY randomPoint + 1)) - fromIntegral gcTileSize),
           playerMode = Air,
           playerVelocity = Point2 0.0 0.0,
           playerWalkSince = Nothing
