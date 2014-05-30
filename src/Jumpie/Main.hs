@@ -25,7 +25,7 @@ import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
 import Jumpie.GameGeneration(generateGame)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
-import System.IO(IO)
+import System.IO(IO,putStrLn)
 import Jumpie.Render(renderGame)
 
 mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
@@ -42,12 +42,13 @@ kdToAction _ = []
 loadImage :: FilePath -> IO Surface
 loadImage = load . (mediaDir </>)
 
-outerMainLoop :: Keydowns -> GameData -> GameState -> GameTicks -> IO ()
+outerMainLoop :: Keydowns -> GameData -> GameState -> GameTicks -> IO GameState
 outerMainLoop oldKeydowns gameData gameState oldTicks = do
   events <- pollEvents
   newTicks <- getTicks
-  unless
-    (outerGameOver events || gsGameover gameState) $ do
+  if (outerGameOver events || gsGameover gameState)
+    then return gameState
+    else do
       let tickDiff = fromIntegral (tickValue newTicks - tickValue oldTicks) / (1000.0 * 1000.0 * 1000.0) :: Double
       let newKeyDowns = processKeydowns oldKeydowns events
       let frameState = FrameState {
@@ -58,6 +59,7 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
       newGameState <- mainLoop events gameData gameState frameState
       flip (gdScreen gameData)
       outerMainLoop newKeyDowns gameData newGameState newTicks
+
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
 processKeydowns k es = (k \\ keyUps) `union` keyDowns
@@ -98,3 +100,5 @@ main = withInit [InitEverything] $ do
     setCaption "jumpie 0.1" []
     ticks <- getTicks
     outerMainLoop [] (GameData images anims screen) (GameState (generateGame g) False) ticks
+    -- Gameover loop here
+    putStrLn "Oh shit"

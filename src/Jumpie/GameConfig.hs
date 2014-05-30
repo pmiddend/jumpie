@@ -24,8 +24,8 @@ import Data.Int(Int)
 import Data.String(String)
 
 screenWidth,screenHeight,screenBpp :: Int
-screenWidth = 800
-screenHeight = 600
+screenWidth = 1200
+screenHeight = 400
 screenBpp = 32
 mediaDir :: String
 mediaDir = "media"

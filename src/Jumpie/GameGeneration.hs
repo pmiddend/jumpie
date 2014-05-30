@@ -45,7 +45,7 @@ platsToPoints :: [Platform] -> [PointInt]
 platsToPoints ps = concatMap pTiles ps
 
 tilesRect :: RectInt
-tilesRect = (Rect (Point2 0 0) (Point2 (screenWidth `div` gcTileSize) (screenHeight `div` gcTileSize)))
+tilesRect = (Rect (Point2 1 1) (Point2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1)))
 
 generateRandomPlats :: RandomGen g => g -> [Platform]
 generateRandomPlats g = randomPlatforms g tilesRect gcPlatMaxLength
