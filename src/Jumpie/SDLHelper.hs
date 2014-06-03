@@ -12,6 +12,7 @@ import Graphics.UI.SDL.Events(Event(NoEvent),pollEvent)
 import Jumpie.Geometry.Point(Point2(Point2),pY,pX)
 import Jumpie.Geometry.LineSegment(LineSegment)
 import Jumpie.Geometry.Rect(Rect(Rect),dimensions)
+import Jumpie.Types(PointInt)
 import Jumpie.Monad(when_)
 import Jumpie.Geometry.Intersection(lineSegmentInsideRect)
 import Jumpie.ImageData(SurfaceData)
@@ -60,10 +61,10 @@ fillSurface screen color = do
   _ <- fillRect screen (Just cr) pixel
   return ()
 
-blitAtPosition :: RealFrac a => SurfaceData -> Point2 a -> Surface -> IO ()
+blitAtPosition :: SurfaceData -> PointInt -> Surface -> IO ()
 blitAtPosition (srcSurface,srcRect) pos destSurface = do
   scrClipRect <- fromSDLRect <$> getClipRect destSurface
-  let destRect = Rect (floor <$> pos) (dimensions srcRect)
+  let destRect = Rect pos (dimensions srcRect)
   when_ (destRect `inside` scrClipRect) $
     (blitSurface srcSurface (Just (toSDLRect srcRect)) destSurface (Just (toSDLRect destRect)))
 

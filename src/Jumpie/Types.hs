@@ -4,6 +4,7 @@ module Jumpie.Types(
   PointReal,
   RectReal,
   LineSegmentReal,
+  LineSegmentInt,
   Real,
   RectInt,
   PointInt,
@@ -24,6 +25,7 @@ type PointInt = Point2 Int
 type PointReal = Point2 Real
 type RectReal = Rect PointReal
 type LineSegmentReal = LineSegment PointReal
+type LineSegmentInt = LineSegment PointInt
 
 data OutgoingAction = Collision
 

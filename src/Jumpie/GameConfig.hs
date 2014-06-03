@@ -15,13 +15,18 @@ module Jumpie.GameConfig(
   screenWidth,
   screenHeight,
   screenBpp,
-  mediaDir
+  mediaDir,
+  backgroundColor
   ) where
 
 import Jumpie.Types(Real)
 import Prelude(fromIntegral,(/),(-),div,(*),(+))
 import Data.Int(Int)
 import Data.String(String)
+import Data.Word(Word8)
+
+backgroundColor :: (Word8,Word8,Word8)
+backgroundColor = (94,129,162)
 
 screenWidth,screenHeight,screenBpp :: Int
 screenWidth = 1200

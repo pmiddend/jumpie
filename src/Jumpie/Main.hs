@@ -1,6 +1,6 @@
 module Main where
 
-import Control.Monad(unless,(>>),return)
+import Control.Monad(return)
 import Data.Bool(Bool(..),(||))
 import Data.Function(($),(.))
 import Data.List(any,map,(\\),union,filter,concatMap)
@@ -18,7 +18,7 @@ import Jumpie.GameConfig(gcTimeMultiplier,screenWidth,screenHeight,screenBpp,med
 import Jumpie.ImageData(readAllDescFiles)
 import Jumpie.SDLHelper(pollEvents)
 import Jumpie.GameData(GameData(GameData),gdScreen)
-import Jumpie.GameState(GameState(GameState),gsObjects,gsGameover)
+import Jumpie.GameState(GameState(GameState),gsGameover)
 import Jumpie.FrameState(FrameState(FrameState),fsTimeDelta,fsKeydowns,fsCurrentTicks)
 import Jumpie.Types(IncomingAction(..),Keydowns)
 import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
@@ -26,12 +26,7 @@ import Jumpie.GameGeneration(generateGame)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
 import System.IO(IO,putStrLn)
-import Jumpie.Render(renderGame)
-
-mainLoop :: [Event] -> GameData -> GameState -> FrameState -> IO GameState
-mainLoop _ gameData gameState frameState = renderGame gameData frameState newState >> return newState
-  where newState = processGame frameState gameState incomingActions
-        incomingActions = concatMap kdToAction (fsKeydowns frameState)
+import Jumpie.Render(renderGame,sdlRenderAll)
 
 kdToAction :: SDLKey -> [IncomingAction]
 kdToAction SDLK_LEFT = [PlayerLeft]
@@ -56,10 +51,11 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
         fsCurrentTicks = newTicks,
         fsKeydowns = newKeyDowns
         }
-      newGameState <- mainLoop events gameData gameState frameState
+      let incomingActions = concatMap kdToAction newKeyDowns
+      let newState = processGame frameState gameState incomingActions
+      sdlRenderAll gameData (renderGame gameData frameState newState)
       flip (gdScreen gameData)
-      outerMainLoop newKeyDowns gameData newGameState newTicks
-
+      outerMainLoop newKeyDowns gameData newState newTicks
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
 processKeydowns k es = (k \\ keyUps) `union` keyDowns
@@ -99,6 +95,6 @@ main = withInit [InitEverything] $ do
     (images,anims) <- readAllDescFiles
     setCaption "jumpie 0.1" []
     ticks <- getTicks
-    outerMainLoop [] (GameData images anims screen) (GameState (generateGame g) False) ticks
+    lastGameState <- outerMainLoop [] (GameData images anims screen) (GameState (generateGame g) False) ticks
     -- Gameover loop here
     putStrLn "Oh shit"
