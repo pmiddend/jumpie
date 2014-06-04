@@ -26,7 +26,7 @@ import Jumpie.GameGeneration(generateGame)
 import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
 import System.FilePath
 import System.IO(IO,putStrLn)
-import Jumpie.Render(renderGame,sdlRenderAll)
+import Jumpie.Render(renderGame,sdlRenderAll,optimizePlats)
 
 kdToAction :: SDLKey -> [IncomingAction]
 kdToAction SDLK_LEFT = [PlayerLeft]
@@ -53,6 +53,7 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
         }
       let incomingActions = concatMap kdToAction newKeyDowns
       let newState = processGame frameState gameState incomingActions
+      --sdlRenderAll gameData (optimizePlats (renderGame gameData frameState newState))
       sdlRenderAll gameData (renderGame gameData frameState newState)
       flip (gdScreen gameData)
       outerMainLoop newKeyDowns gameData newState newTicks

@@ -1,6 +1,8 @@
 module Jumpie.Render(
   renderGame,
-  sdlRenderAll) where
+  sdlRenderAll,
+  optimizePlats,
+  RenderCommand(..)) where
 
 import Control.Applicative((<$>))
 import Control.Monad(mapM_)
@@ -26,13 +28,31 @@ import Jumpie.GameConfig(backgroundColor)
 import Jumpie.FrameState(FrameState,fsCurrentTicks)
 import Jumpie.Types(PointReal,LineSegmentInt,PointInt)
 import Jumpie.Time(tickValue,GameTicks)
-import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
+import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs,error)
 import System.IO(IO)
+import Debug.Trace(trace)
 import Jumpie.ImageData(ImageId,animFrames,animFrameSwitch)
+import Text.Show(show,Show)
+import Data.Eq(Eq)
 
 type RGBColor = (Word8,Word8,Word8)
 
-data RenderCommand = FillScreen RGBColor | RenderSprite String PointInt | RenderLine RGBColor LineSegmentInt
+data RenderCommand = FillScreen RGBColor | RenderSprite String PointInt | RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
+
+-- Mutumorphismus zwischen optimizePlats und compressPlatforms
+optimizePlats :: [RenderCommand] -> [RenderCommand]
+optimizePlats ((p@(RenderSprite "platforml" _)):xs) = compressPlatforms [p] xs
+optimizePlats (x:xs) = x:(optimizePlats xs)
+optimizePlats [] = []
+compressPlatforms :: [RenderCommand] -> [RenderCommand] -> [RenderCommand]
+compressPlatforms ns (q@(RenderSprite "platformm" _):ys) = compressPlatforms (ns ++ [q]) ys
+compressPlatforms ns (q@(RenderSprite "platformr" _):ys) = compressPlatform (ns ++ [q]) : optimizePlats ys
+compressPlatforms ns (q@(RenderSprite s _):ys) = error $ "Invalid platform configuration, ends in \"" ++ s ++ "\", previous: " ++ show ns
+compressPlatforms _ _ = error "Invalid platform configuration, doesn't end in \"platformr\" element"
+compressPlatform :: [RenderCommand] -> RenderCommand
+--compressPlatform ((RenderSprite _ pos):ns) = RenderSprite ("platform" ++ show (length ns - 1)) pos
+compressPlatform ((RenderSprite _ pos):ns) = RenderSprite ("platform" ++ trace (show (length ns - 1)) (show (length ns - 1))) pos
+compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
 renderGame :: GameData -> FrameState -> GameState -> [RenderCommand]
 renderGame gd fs gs = FillScreen backgroundColor : concatMap (renderObject gd fs) (gsObjects gs)
