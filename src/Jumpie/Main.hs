@@ -29,7 +29,7 @@ import           Jumpie.GameGeneration (generateGame)
 import           Jumpie.GameState      (GameState (GameState), gsGameover)
 import           Jumpie.ImageData      (readAllDescFiles)
 import           Jumpie.Render         (optimizePlats, renderGame, sdlRenderAll)
-import           Jumpie.SDLHelper      (pollEvents)
+import           Jumpie.SDLHelper      (pollEvents, withRenderer, withWindow)
 import           Jumpie.Time           (GameTicks, TimeDelta (TimeDelta),
                                         getTicks, tickValue)
 import           Jumpie.Types          (IncomingAction (..), Keydowns)
@@ -100,16 +100,15 @@ myCreateWindow title = withCStringLen title $ \windowTitle -> do
 main :: IO ()
 main =
   withImgInit [InitPNG] $ do
-    window <- myCreateWindow "jumpie 0.1"
-    renderer <- createRenderer window (-1) 0
-    renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)
-    g <- getStdGen
-    (images,anims) <- readAllDescFiles renderer
-    ticks <- getTicks
-    lastGameState <- outerMainLoop
-                     []
-                     (GameData images anims renderer)
-                     (GameState (generateGame g) False)
-                     ticks
-    -- Gameover loop here
-    putStrLn "Oh shit"
+    withWindow "jumpie 0.1" $ \window -> do
+      withRenderer window screenWidth screenHeight $ \renderer -> do
+        g <- getStdGen
+        (images,anims) <- readAllDescFiles renderer
+        ticks <- getTicks
+        lastGameState <- outerMainLoop
+                       []
+                       (GameData images anims renderer)
+                       (GameState (generateGame g) False)
+                       ticks
+        -- Gameover loop here
+        putStrLn "Oh shit"

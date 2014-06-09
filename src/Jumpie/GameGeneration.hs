@@ -4,22 +4,29 @@ module Jumpie.GameGeneration(
   generateGame
   ) where
 
-import Jumpie.GameConfig(screenWidth, screenHeight,gcTileSize,gcPlatCount,gcPlatMaxLength)
-import Jumpie.GameObject(Player(Player),playerPosition,playerWalkSince,playerMode,playerVelocity,PlayerMode(..),Box(Box),GameObject(..),BoxType(..))
-import Jumpie.Geometry.Point(Point2(Point2),pX,pY)
-import Jumpie.Geometry.Rect(Rect(Rect))
-import Jumpie.Types(RectInt,PointInt)
-import Jumpie.Random(randomElem)
-import Jumpie.Debug(traceShowId)
-import Prelude(fromIntegral,(/),(-),div,(*),(+))
-import Data.Function(($),(.))
-import Control.Applicative((<$>))
-import Data.Functor(fmap)
-import Data.Maybe(Maybe(Nothing))
-import Data.List(map,take,concatMap,elem)
-import System.Random(RandomGen)
-import Data.Bool((&&))
-import Jumpie.LevelGeneration(Platform(Platform),randomPlatforms,validPlatforms,easyParabolas,pTiles)
+import           Jumpie.GameConfig      (gcPlatCount, gcPlatMaxLength,
+                                         gcTileSize, screenHeight, screenWidth)
+import           Jumpie.GameObject      (Box (Box), BoxType (..),
+                                         GameObject (..), Player (Player),
+                                         PlayerMode (..), playerMode,
+                                         playerPosition, playerVelocity,
+                                         playerWalkSince)
+import           Jumpie.Geometry.Point  (Point2 (Point2), pX, pY)
+import           Jumpie.Geometry.Rect   (Rect (Rect))
+import           Jumpie.Random          (randomElem)
+import           Jumpie.Types           (PointInt, RectInt)
+--import Jumpie.Debug(traceShowId)
+import           Control.Applicative    ((<$>))
+import           Data.Bool              ((&&))
+import           Data.Function          (($), (.))
+import           Data.Functor           (fmap)
+import           Data.List              (concatMap, elem, map, take)
+import           Data.Maybe             (Maybe (Nothing))
+import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
+                                         pTiles, randomPlatforms,
+                                         validPlatforms)
+import           Prelude                (div, fromIntegral, (*), (+), (-), (/))
+import           System.Random          (RandomGen)
 
   {-
 initialPlayer :: Player

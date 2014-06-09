@@ -7,45 +7,63 @@ module Jumpie.SDLHelper(
 -}
   blitAtPosition,
   pollEvents,
-  fromSDLRect
+  fromSDLRect,
+  withWindow,
+  withRenderer
   ) where
 
-import           Control.Applicative          ((<$>))
-import           Control.Monad                (forM_, return, when)
-import           Data.Function                (($))
-import           Data.Int                     (Int)
-import           Data.Maybe                   (Maybe (..))
-import           Data.Ord                     ((>))
-import           Data.Word                    (Word8)
-import           Foreign.Marshal.Array        (allocaArray, peekArray)
-import           Foreign.Marshal.Utils        (with)
-import           Foreign.Ptr                  (Ptr, nullPtr)
-import           Foreign.Ptr                  (castPtr)
-import           Foreign.Storable             (pokeElemOff)
-import           Graphics.UI.SDL.Enum         (eventActionGetEvent,
-                                               eventTypeFirstEvent,
-                                               eventTypeLastEvent,
-                                               windowFlagFullscreenDesktop,
-                                               windowPosUndefined)
-import           Graphics.UI.SDL.Event        (peepEvents, pumpEvents)
-import qualified Graphics.UI.SDL.Types        as SDLT
-import           Graphics.UI.SDL.Video        (createRenderer, createWindow,
-                                               renderCopy, renderPresent,
-                                               renderSetLogicalSize)
-import           Jumpie.Bresenham             (bresenham)
-import           Jumpie.Debug                 (traceShowId)
-import           Jumpie.Geometry.Intersection (lineSegmentInsideRect)
-import           Jumpie.Geometry.LineSegment  (LineSegment)
-import           Jumpie.Geometry.Point        (Point2 (Point2), pX, pY)
-import           Jumpie.Geometry.Rect         (Rect (Rect), dimensions)
-import           Jumpie.Geometry.Rect         (inside)
-import           Jumpie.ImageData             (SurfaceData)
-import           Jumpie.Monad                 (when_)
-import           Jumpie.Types                 (PointInt)
-import           Prelude                      (RealFrac, floor, fromEnum,
-                                               fromIntegral, (*), (+), (-))
-import           System.IO                    (IO)
+import           Control.Monad         (return)
+import           Data.Function         (($))
+import           Data.Int              (Int)
+import           Data.Tuple            (fst)
+import           Foreign.Marshal.Array (allocaArray, peekArray)
+import           Foreign.Marshal.Utils (with)
+import           Graphics.UI.SDL.Enum  (eventActionGetEvent,
+                                        eventTypeFirstEvent, eventTypeLastEvent)
+import           Graphics.UI.SDL.Event (peepEvents, pumpEvents)
+import qualified Graphics.UI.SDL.Types as SDLT
+import           Graphics.UI.SDL.Video (renderCopy)
+--import           Jumpie.Bresenham             (bresenham)
+--import           Jumpie.Debug                 (traceShowId)
+--import           Jumpie.Geometry.Intersection (lineSegmentInsideRect)
+--import           Jumpie.Geometry.LineSegment  (LineSegment)
+import           Jumpie.Geometry.Point (Point2 (Point2))
+import           Jumpie.Geometry.Rect  (Rect (Rect), dimensions)
+--import           Jumpie.Geometry.Rect         (inside)
+import           Jumpie.ImageData      (SurfaceData)
+--import           Jumpie.Monad                 (when_)
+import           Control.Exception     (bracket)
+import           Data.String           (String)
+import           Foreign.C.String      (withCStringLen)
+import           Graphics.UI.SDL.Enum  (windowPosUndefined, windowPosUndefined)
+import           Graphics.UI.SDL.Types (Renderer, Window)
+import           Graphics.UI.SDL.Video (createRenderer, createWindow,
+                                        destroyRenderer, destroyWindow,
+                                        renderPresent, renderSetLogicalSize)
+import           Jumpie.Types          (PointInt)
+import           Prelude               (RealFrac, floor, fromEnum, fromIntegral,
+                                        (*), (+), (-))
+import           System.IO             (IO)
 
+screenAbsoluteWidth,screenAbsoluteHeight :: Int
+screenAbsoluteWidth = 0
+screenAbsoluteHeight = 0
+windowFlags :: Int
+windowFlags = 0
+
+withWindow :: String -> (Window -> IO a) -> IO a
+withWindow title callback = withCStringLen title $ \windowTitle ->
+  let acquireResource = createWindow (fst windowTitle) windowPosUndefined windowPosUndefined (fromIntegral screenAbsoluteWidth) (fromIntegral screenAbsoluteHeight) (fromIntegral windowFlags)
+      releaseResource = destroyWindow
+  in bracket acquireResource releaseResource callback
+
+withRenderer :: Window -> Int -> Int -> (Renderer -> IO a) -> IO a
+withRenderer window screenWidth screenHeight callback =
+  let acquireResource = createRenderer window (-1) 0
+      releaseResource = destroyRenderer
+  in bracket acquireResource releaseResource $ \renderer -> do
+    renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)
+    callback renderer
 {-
 createPixel :: Surface -> (Word8,Word8,Word8) -> IO Pixel
 createPixel s (r,g,b) = mapRGB (surfaceGetPixelFormat s) r g b
@@ -83,6 +101,7 @@ blitAtPosition (srcSurface,srcRect) pos renderer = do
   renderSprite renderer srcSurface (toSDLRect srcRect) (toSDLRect destRect)
   return ()
 
+eventArrayStaticSize :: Int
 eventArrayStaticSize = 128
 
 -- Wrapper um das etwas eklige pollEvent
