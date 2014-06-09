@@ -19,10 +19,10 @@ executable jumpie
   main-is:             Jumpie/Main.hs
   -- other-modules:
   hs-source-dirs:      src
-  build-depends:       base == 4.6.* || == 4.7.*,
-                       SDL == 0.6.5,
-                       SDL-image == 0.6.1,
+  build-depends:       HUnit >= 1.2.5.2,
+                       base == 4.6.* || == 4.7.*,
                        clock == 0.4.0.1,
+                       sdl2 == 1.1.0, sdl2-image == 0.1.1.1,
                        filepath == 1.3.0.2,
                        directory == 1.2.1.0,
                        composition == 1.0.1.0,
@@ -40,10 +40,9 @@ test-suite Main
   type:                exitcode-stdio-1.0
   build-depends:       base == 4.6.* || == 4.7.*,
                        QuickCheck > 2,
+                       sdl2 == 1.1.0, sdl2-image == 0.1.1.1,
                        test-framework >= 0.6,
                        test-framework-quickcheck2 >= 0.2,
-                       SDL == 0.6.5,
-                       SDL-image == 0.6.1,
                        clock == 0.4.0.1,
                        filepath == 1.3.0.2,
                        directory == 1.2.1.0,
@@ -62,9 +61,8 @@ test-suite UnitMain
   build-depends:       base == 4.6.* || == 4.7.*,
                        QuickCheck > 2,
                        test-framework >= 0.6,
+                       sdl2 == 1.1.0, sdl2-image == 0.1.1.1,
                        test-framework-quickcheck2 >= 0.2,
-                       SDL == 0.6.5,
-                       SDL-image == 0.6.1,
                        clock == 0.4.0.1,
                        filepath == 1.3.0.2,
                        directory == 1.2.1.0,

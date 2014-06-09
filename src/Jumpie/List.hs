@@ -2,7 +2,9 @@ module Jumpie.List(
   setPartList,
   replaceNth,
   orEmptyTrue,
-  inductiveFilter
+  inductiveFilter,
+  withSuccessor,
+  withPredecessor
   ) where
 
 import Data.Int(Int)
@@ -10,6 +12,19 @@ import Data.List(take,replicate,drop,(++),or)
 import Prelude((+),(-),otherwise)
 import Data.Ord((<))
 import Data.Bool(Bool(True))
+import Data.Maybe(Maybe(..))
+
+withSuccessor :: [a] -> [(a,Maybe a)]
+withSuccessor [] = []
+withSuccessor (x:[]) = [(x,Nothing)]
+withSuccessor (x:y:xs) = (x,Just y) : withSuccessor (y:xs)
+
+withPredecessor :: [a] -> [(Maybe a,a)]
+withPredecessor [] = []
+withPredecessor l@(a:_) = (Nothing,a) : withPredecessor' l
+  where withPredecessor' [] = []
+        withPredecessor' (_:[]) = []
+        withPredecessor' (x:y:xs) = (Just x,y) : withPredecessor' xs
 
 orEmptyTrue :: [Bool] -> Bool
 orEmptyTrue [] = True

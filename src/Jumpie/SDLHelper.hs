@@ -1,38 +1,52 @@
 module Jumpie.SDLHelper(
+  {-
   putPixel32,
   createPixel,
   surfaceBresenham,
   fillSurface,
+-}
   blitAtPosition,
   pollEvents,
   fromSDLRect
   ) where
 
-import Graphics.UI.SDL.Events(Event(NoEvent),pollEvent)
-import Jumpie.Geometry.Point(Point2(Point2),pY,pX)
-import Jumpie.Geometry.LineSegment(LineSegment)
-import Jumpie.Geometry.Rect(Rect(Rect),dimensions)
-import Jumpie.Types(PointInt)
-import Jumpie.Monad(when_)
-import Jumpie.Geometry.Intersection(lineSegmentInsideRect)
-import Jumpie.ImageData(SurfaceData)
-import Prelude((+),(*),RealFrac,floor,(-))
-import qualified Graphics.UI.SDL.Rect as SDLR
-import Graphics.UI.SDL.Types(Surface,surfaceGetPixelFormat,surfaceGetPixels,surfaceGetWidth)
-import Data.Maybe(Maybe(..))
-import Graphics.UI.SDL.Video(mapRGB,lockSurface,unlockSurface,getClipRect,fillRect,blitSurface)
-import Graphics.UI.SDL.Color(Pixel(Pixel))
-import Control.Monad(forM_,return,when)
-import Jumpie.Geometry.Rect(inside)
-import Data.Function(($))
-import Data.Word(Word8)
-import System.IO(IO)
-import Control.Applicative((<$>))
-import Data.Int(Int)
-import Foreign.Ptr(castPtr)
-import Foreign.Storable(pokeElemOff)
-import Jumpie.Bresenham(bresenham)
+import           Control.Applicative          ((<$>))
+import           Control.Monad                (forM_, return, when)
+import           Data.Function                (($))
+import           Data.Int                     (Int)
+import           Data.Maybe                   (Maybe (..))
+import           Data.Ord                     ((>))
+import           Data.Word                    (Word8)
+import           Foreign.Marshal.Array        (allocaArray, peekArray)
+import           Foreign.Marshal.Utils        (with)
+import           Foreign.Ptr                  (Ptr, nullPtr)
+import           Foreign.Ptr                  (castPtr)
+import           Foreign.Storable             (pokeElemOff)
+import           Graphics.UI.SDL.Enum         (eventActionGetEvent,
+                                               eventTypeFirstEvent,
+                                               eventTypeLastEvent,
+                                               windowFlagFullscreenDesktop,
+                                               windowPosUndefined)
+import           Graphics.UI.SDL.Event        (peepEvents, pumpEvents)
+import qualified Graphics.UI.SDL.Types        as SDLT
+import           Graphics.UI.SDL.Video        (createRenderer, createWindow,
+                                               renderCopy, renderPresent,
+                                               renderSetLogicalSize)
+import           Jumpie.Bresenham             (bresenham)
+import           Jumpie.Debug                 (traceShowId)
+import           Jumpie.Geometry.Intersection (lineSegmentInsideRect)
+import           Jumpie.Geometry.LineSegment  (LineSegment)
+import           Jumpie.Geometry.Point        (Point2 (Point2), pX, pY)
+import           Jumpie.Geometry.Rect         (Rect (Rect), dimensions)
+import           Jumpie.Geometry.Rect         (inside)
+import           Jumpie.ImageData             (SurfaceData)
+import           Jumpie.Monad                 (when_)
+import           Jumpie.Types                 (PointInt)
+import           Prelude                      (RealFrac, floor, fromEnum,
+                                               fromIntegral, (*), (+), (-))
+import           System.IO                    (IO)
 
+{-
 createPixel :: Surface -> (Word8,Word8,Word8) -> IO Pixel
 createPixel s (r,g,b) = mapRGB (surfaceGetPixelFormat s) r g b
 
@@ -60,26 +74,31 @@ fillSurface screen color = do
   pixel <- createPixel screen color
   _ <- fillRect screen (Just cr) pixel
   return ()
+-}
+renderSprite r t srcrect dstrect = with srcrect $ \srcrectptr -> with dstrect $ \dstrectptr -> renderCopy r t srcrectptr dstrectptr
 
-blitAtPosition :: SurfaceData -> PointInt -> Surface -> IO ()
-blitAtPosition (srcSurface,srcRect) pos destSurface = do
-  scrClipRect <- fromSDLRect <$> getClipRect destSurface
-  let destRect = Rect pos (dimensions srcRect)
-  when_ (destRect `inside` scrClipRect) $
-    (blitSurface srcSurface (Just (toSDLRect srcRect)) destSurface (Just (toSDLRect destRect)))
+blitAtPosition :: SurfaceData -> PointInt -> SDLT.Renderer -> IO ()
+blitAtPosition (srcSurface,srcRect) pos renderer = do
+  let destRect = Rect pos (pos + (dimensions srcRect))
+  renderSprite renderer srcSurface (toSDLRect srcRect) (toSDLRect destRect)
+  return ()
+
+eventArrayStaticSize = 128
 
 -- Wrapper um das etwas eklige pollEvent
-pollEvents :: IO [Event]
-pollEvents = do
-  event <- pollEvent
-  case event of
-    NoEvent -> return []
-    _ -> do
-      events <- pollEvents
-      return $ event : events
+pollEvents :: IO [SDLT.Event]
+pollEvents = allocaArray eventArrayStaticSize $ \eventArray -> do
+  pumpEvents
+  events <- peepEvents
+    eventArray
+    (fromIntegral eventArrayStaticSize)
+    eventActionGetEvent
+    eventTypeFirstEvent
+    eventTypeLastEvent
+  peekArray (fromEnum events) $ eventArray
 
-fromSDLRect :: SDLR.Rect -> Rect (Point2 Int)
-fromSDLRect (SDLR.Rect x y w h) = Rect (Point2 x y) (Point2 (x+w) (y+h))
+fromSDLRect :: SDLT.Rect -> Rect (Point2 Int)
+fromSDLRect (SDLT.Rect x y w h) = Rect (Point2 (fromIntegral x) (fromIntegral y)) (Point2 (fromIntegral (x+w)) (fromIntegral (y+h)))
 
-toSDLRect :: Rect (Point2 Int) -> SDLR.Rect
-toSDLRect (Rect (Point2 l t) (Point2 r b)) = SDLR.Rect l t (r-l) (b-t)
+toSDLRect :: Rect (Point2 Int) -> SDLT.Rect
+toSDLRect (Rect (Point2 l t) (Point2 r b)) = SDLT.Rect (fromIntegral l) (fromIntegral t) (fromIntegral (r-l)) (fromIntegral (b-t))

@@ -1,14 +1,13 @@
 module Jumpie.GameData(
   GameData(GameData),
   gdSurfaces,
-  gdAnims,
-  gdScreen) where
+  gdAnims, gdRenderer) where
 
-import Jumpie.ImageData(SurfaceMap,AnimMap)
-import Graphics.UI.SDL.Types(Surface)
+import           Graphics.UI.SDL.Types (Renderer)
+import           Jumpie.ImageData      (AnimMap, SurfaceMap)
 
 data GameData = GameData {
                 gdSurfaces :: SurfaceMap,
-                gdAnims :: AnimMap,
-                gdScreen :: Surface
+                gdAnims    :: AnimMap,
+                gdRenderer :: Renderer
               }

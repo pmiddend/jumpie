@@ -10,13 +10,13 @@ module Jumpie.Types(
   PointInt,
   Keydowns) where
 
-import Data.Eq(Eq)
-import Data.Int(Int)
-import Graphics.UI.SDL.Keysym(SDLKey)
-import Jumpie.Geometry.LineSegment(LineSegment)
-import Jumpie.Geometry.Point(Point2(..))
-import Jumpie.Geometry.Rect(Rect())
-import Prelude(Double)
+import           Data.Eq                     (Eq)
+import           Data.Int                    (Int)
+import           Graphics.UI.SDL.Enum        (Scancode)
+import           Jumpie.Geometry.LineSegment (LineSegment)
+import           Jumpie.Geometry.Point       (Point2 (..))
+import           Jumpie.Geometry.Rect        (Rect ())
+import           Prelude                     (Double)
 
 type RectInt = Rect (Point2 Int)
 
@@ -31,4 +31,4 @@ data OutgoingAction = Collision
 
 data IncomingAction = PlayerLeft | PlayerRight | PlayerJump deriving(Eq)
 
-type Keydowns = [SDLKey]
+type Keydowns = [Scancode]

@@ -14,10 +14,13 @@ import Test.Framework.TH
 import Test.Framework.Providers.QuickCheck2
 import Jumpie.Geometry.Point(Point2(Point2),pX,pY)
 import Jumpie.Geometry.Rect(Rect(Rect),rectTopLeft,rectBottomRight)
-import Jumpie.List(setPartList,replaceNth,orEmptyTrue)
+import Jumpie.List(setPartList,replaceNth,orEmptyTrue,withSuccessor,withPredecessor)
+import Data.List(head,last)
 import Jumpie.LevelGeneration(randomPlatform,Platform(Platform))
 import Control.Applicative((<$>),(<*>))
 import System.Random(mkStdGen)
+import Data.Tuple(fst,snd)
+import Data.Maybe(isNothing)
 
 instance Arbitrary a => Arbitrary (Point2 a) where
   arbitrary = Point2 <$> arbitrary <*> arbitrary
@@ -27,6 +30,9 @@ instance Arbitrary (Rect (Point2 Int)) where
     topLeft <- arbitrary
     bottomRight <- suchThat arbitrary (\(Point2 x y) -> x > pX topLeft && y > pY topLeft)
     return $ Rect topLeft bottomRight
+
+prop_withSuccessor_lastNothing xs = not (null xs) ==> isNothing (snd (last (withSuccessor xs)))
+prop_withPredecessor_headNothing xs = not (null xs) ==> isNothing (fst (head (withPredecessor xs)))
 
 prop_platforms_length_bounded seed rect maxLength = maxLength > 0 ==> isBounded (randomPlatform (mkStdGen seed) rect maxLength)
   where isBounded ((Platform (Point2 left top) (Point2 right _)),_) = right - left <= maxLength

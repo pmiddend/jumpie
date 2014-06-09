@@ -1,41 +1,48 @@
 module Main where
 
-import Control.Monad(return)
-import Data.Bool(Bool(..),(||))
-import Data.Function(($),(.))
-import Data.List(any,map,(\\),union,filter,concatMap)
-import Graphics.UI.SDL(withInit,InitFlag(InitEverything),flip)
-import Graphics.UI.SDL.Events(Event(Quit,KeyDown,KeyUp))
-import System.Random(getStdGen)
-import Graphics.UI.SDL.Image(load)
-import Graphics.UI.SDL.Keysym(Keysym(..),SDLKey(SDLK_ESCAPE))
-import Graphics.UI.SDL.Keysym(SDLKey(..))
-import Graphics.UI.SDL.Types(SurfaceFlag(SWSurface),Surface)
-import Graphics.UI.SDL.Video(setVideoMode)
-import Graphics.UI.SDL.WindowManagement(setCaption)
-import Jumpie.Game(processGame)
-import Jumpie.GameConfig(gcTimeMultiplier,screenWidth,screenHeight,screenBpp,mediaDir)
-import Jumpie.ImageData(readAllDescFiles)
-import Jumpie.SDLHelper(pollEvents)
-import Jumpie.GameData(GameData(GameData),gdScreen)
-import Jumpie.GameState(GameState(GameState),gsGameover)
-import Jumpie.FrameState(FrameState(FrameState),fsTimeDelta,fsKeydowns,fsCurrentTicks)
-import Jumpie.Types(IncomingAction(..),Keydowns)
-import Jumpie.Time(TimeDelta(TimeDelta),tickValue,GameTicks,getTicks)
-import Jumpie.GameGeneration(generateGame)
-import Prelude(Double,undefined,fromIntegral,(-),(/),Fractional,div,error,floor,(+),(*),Integral,mod,abs)
-import System.FilePath
-import System.IO(IO,putStrLn)
-import Jumpie.Render(renderGame,sdlRenderAll,optimizePlats)
+import           Control.Monad         (return)
+import           Data.Bool             (Bool (..), (||))
+import           Data.Eq               ((==))
+import           Data.Function         (($), (.))
+import           Data.List             (any, concatMap, filter, lookup, map,
+                                        union, (\\))
+import           Data.Maybe            (fromMaybe)
+import           Data.String           (String)
+import           Data.Tuple            (fst)
+import           Foreign.C.String      (withCStringLen)
+import           Graphics.UI.SDL.Enum  (Scancode, eventTypeKeyDown,
+                                        eventTypeKeyUp, scancodeEscape,
+                                        scancodeLeft, scancodeRight, scancodeUp,
+                                        windowPosUndefined, windowPosUndefined)
+import           Graphics.UI.SDL.Image (InitFlag (..), withImgInit)
+import           Graphics.UI.SDL.Types (Event (QuitEvent, KeyboardEvent),
+                                        Keysym (Keysym), Window)
+import           Graphics.UI.SDL.Video (createRenderer, createWindow,
+                                        renderPresent, renderSetLogicalSize)
+import           Jumpie.FrameState     (FrameState (FrameState), fsCurrentTicks,
+                                        fsKeydowns, fsTimeDelta)
+import           Jumpie.Game           (processGame)
+import           Jumpie.GameConfig     (gcTimeMultiplier, screenHeight,
+                                        screenWidth)
+import           Jumpie.GameData       (GameData (GameData), gdRenderer)
+import           Jumpie.GameGeneration (generateGame)
+import           Jumpie.GameState      (GameState (GameState), gsGameover)
+import           Jumpie.ImageData      (readAllDescFiles)
+import           Jumpie.Render         (optimizePlats, renderGame, sdlRenderAll)
+import           Jumpie.SDLHelper      (pollEvents)
+import           Jumpie.Time           (GameTicks, TimeDelta (TimeDelta),
+                                        getTicks, tickValue)
+import           Jumpie.Types          (IncomingAction (..), Keydowns)
+import           Prelude               (Double, Fractional, Integral, abs, div,
+                                        error, floor, fromIntegral, mod,
+                                        undefined, (*), (+), (-), (/))
+import           System.IO             (IO, putStrLn)
+import           System.Random         (getStdGen)
 
-kdToAction :: SDLKey -> [IncomingAction]
-kdToAction SDLK_LEFT = [PlayerLeft]
-kdToAction SDLK_RIGHT = [PlayerRight]
-kdToAction SDLK_UP = [PlayerJump]
-kdToAction _ = []
-
-loadImage :: FilePath -> IO Surface
-loadImage = load . (mediaDir </>)
+kdToAction :: Scancode -> [IncomingAction]
+kdToAction sc = fromMaybe [] $ lookup
+                sc
+                [(scancodeLeft,[PlayerLeft]),(scancodeRight,[PlayerRight]),(scancodeUp,[PlayerJump])]
 
 outerMainLoop :: Keydowns -> GameData -> GameState -> GameTicks -> IO GameState
 outerMainLoop oldKeydowns gameData gameState oldTicks = do
@@ -53,49 +60,56 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
         }
       let incomingActions = concatMap kdToAction newKeyDowns
       let newState = processGame frameState gameState incomingActions
-      --sdlRenderAll gameData (optimizePlats (renderGame gameData frameState newState))
-      sdlRenderAll gameData (renderGame gameData frameState newState)
-      flip (gdScreen gameData)
+      sdlRenderAll gameData (optimizePlats (renderGame gameData frameState newState))
+      renderPresent (gdRenderer gameData)
       outerMainLoop newKeyDowns gameData newState newTicks
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
 processKeydowns k es = (k \\ keyUps) `union` keyDowns
   where keyUps = (map toKey  . filter isKeyUp) es
         keyDowns = (map toKey  . filter isKeyDown) es
-        isKeyUp (KeyUp _) = True
+        isKeyUp (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyUp
         isKeyUp _ = False
-        isKeyDown (KeyDown _) = True
+        isKeyDown (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyDown
         isKeyDown _ = False
         toKey e = case e of
-          KeyDown (Keysym l _ _) -> l
-          KeyUp (Keysym l _ _) -> l
+          KeyboardEvent _ _ _ _ _ (Keysym l _ _) -> l
           _ -> undefined
 
 -- Vorfilterung der Events, ob das Spiel beendet werden soll
 outerGameOver :: [Event] -> Bool
 outerGameOver events = any outerGameOver' events
-  where outerGameOver' Quit = True
-        outerGameOver' (KeyDown Keysym {symKey = SDLK_ESCAPE}) = True
+  where outerGameOver' (QuitEvent _ _) = True
+        outerGameOver' (KeyboardEvent _ _ _ _ _ (Keysym sc _ _)) = sc == scancodeEscape
         outerGameOver' _ = False
 
+screenAbsoluteWidth = 0
+screenAbsoluteHeight = 0
+windowFlags = 0
+
+myCreateWindow :: String -> IO Window
+myCreateWindow title = withCStringLen title $ \windowTitle -> do
+  createWindow
+    (fst windowTitle)
+    windowPosUndefined
+    windowPosUndefined
+    screenAbsoluteWidth
+    screenAbsoluteHeight
+    windowFlags
+
 main :: IO ()
-main = withInit [InitEverything] $ do
-    screen <- setVideoMode screenWidth screenHeight screenBpp [SWSurface]
+main =
+  withImgInit [InitPNG] $ do
+    window <- myCreateWindow "jumpie 0.1"
+    renderer <- createRenderer window (-1) 0
+    renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)
     g <- getStdGen
-    {-
-    -- Randomplatforms
-    let boundingRect = (Rect (Point2 0 0) (Point2 21 21))
-    let randomPlats = randomPlatforms g (Rect (Point2 0 0) (Point2 20 20)) 5
-    -- Valid platforms
-    --putStrLn $ showPlatformsPpm boundingRect $ randomPlats
-    let validPlats = take 20 $ validPlatforms randomPlats
-    putStrLn $ "Number of plats: " ++ (show (length validPlats))
-    putStrLn $ "Plats: " ++ (show validPlats)
-    putStrLn $ showPlatformsPpm boundingRect $ validPlats
-    -}
-    (images,anims) <- readAllDescFiles
-    setCaption "jumpie 0.1" []
+    (images,anims) <- readAllDescFiles renderer
     ticks <- getTicks
-    lastGameState <- outerMainLoop [] (GameData images anims screen) (GameState (generateGame g) False) ticks
+    lastGameState <- outerMainLoop
+                     []
+                     (GameData images anims renderer)
+                     (GameState (generateGame g) False)
+                     ticks
     -- Gameover loop here
     putStrLn "Oh shit"

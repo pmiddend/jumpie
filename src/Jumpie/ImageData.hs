@@ -1,4 +1,6 @@
-{-# LANGUAGE TupleSections,FlexibleContexts #-}
+{-# LANGUAGE FlexibleContexts      #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TupleSections         #-}
 module Jumpie.ImageData(
   ImageId,
   ImageMap,
@@ -10,34 +12,35 @@ module Jumpie.ImageData(
   SurfaceData
   ) where
 
-import Control.Monad(filterM,(>>=))
-import Data.Maybe(mapMaybe,Maybe(Just,Nothing))
-import Data.Function((.))
-import Data.Eq((==))
-import Data.Int(Int)
-import Data.Map.Strict(fromList,union,empty)
-import Jumpie.Types(RectInt)
-import Jumpie.Geometry.Point(Point2(Point2))
-import Jumpie.Geometry.Rect(Rect(Rect))
-import Jumpie.Parsec(int,safeParseFromFile)
-import Graphics.UI.SDL.Types(Surface)
-import Text.Parsec.Prim(Stream,ParsecT,(<|>))
-import Text.Parsec.Char(char,noneOf)
-import Text.Parsec.Combinator(eof,sepEndBy1)
-import Text.Parsec(many1)
-import Data.Traversable(traverse)
-import Jumpie.GameConfig(mediaDir)
-import System.FilePath
-import Graphics.UI.SDL.Image(load)
-import Data.List(foldr,filter,map)
-import System.Directory(getDirectoryContents,doesFileExist)
-import Control.Applicative((<$>),(<*>),(*>),(<*))
-import Control.Category((>>>))
-import Prelude(Char)
-import Data.Tuple(fst,snd)
-import System.IO(IO)
-import Data.String
-import Data.Map.Strict(Map)
+import           Control.Applicative    ((*>), (<$>), (<*), (<*>))
+import           Control.Category       ((>>>))
+import           Control.Monad          (filterM, return, (>>=))
+import           Data.Either            (Either (..))
+import           Data.Eq                ((==))
+import           Data.Function          (($), (.))
+import           Data.Int               (Int)
+import           Data.List              (filter, foldr, map, (++))
+import           Data.Map.Strict        (empty, fromList, union)
+import           Data.Map.Strict        (Map)
+import           Data.Maybe             (Maybe (Just, Nothing), mapMaybe)
+import           Data.String
+import           Data.Traversable       (traverse)
+import           Data.Tuple             (fst, snd)
+import           Graphics.UI.SDL.Image  (imgLoadTexture)
+import qualified Graphics.UI.SDL.Types  as SDLT
+import           Jumpie.GameConfig      (mediaDir)
+import           Jumpie.Geometry.Point  (Point2 (Point2))
+import           Jumpie.Geometry.Rect   (Rect (Rect))
+import           Jumpie.Parsec          (int, safeParseFromFile)
+import           Jumpie.Types           (RectInt)
+import           Prelude                (Char, error)
+import           System.Directory       (doesFileExist, getDirectoryContents)
+import           System.FilePath
+import           System.IO              (IO)
+import           Text.Parsec            (many1)
+import           Text.Parsec.Char       (char, noneOf)
+import           Text.Parsec.Combinator (eof, sepEndBy1)
+import           Text.Parsec.Prim       (ParsecT, Stream, (<|>))
 
 data DataLine = DataLineImage (ImageId,RectInt) | DataLineAnim (AnimId,Animation)
 
@@ -47,13 +50,13 @@ type ImageMap = Map ImageId RectInt
 
 type ImageDescFile = FilePath
 
-type SurfaceData = (Surface,RectInt)
+type SurfaceData = (SDLT.Texture,RectInt)
 
 type SurfaceMap = Map ImageId SurfaceData
 
 data Animation = Animation {
   animFrameSwitch :: Int,
-  animFrames :: [ImageId]
+  animFrames      :: [ImageId]
   }
 
 type AnimId = String
@@ -68,10 +71,10 @@ getFilesInDir dir = getDirectoryContents dir >>= filterM (doesFileExist . (media
 getDescFilesInDir :: FilePath -> IO [ImageDescFile]
 getDescFilesInDir dir = ((mediaDir </>) <$>) <$> filter (takeExtension >>> (== ".txt")) <$> (getFilesInDir dir)
 
-readAllDescFiles :: IO (SurfaceMap,AnimMap)
-readAllDescFiles = (,) <$> (foldr union empty <$> smaps) <*> (foldr union empty <$> amaps)
+readAllDescFiles :: SDLT.Renderer -> IO (SurfaceMap,AnimMap)
+readAllDescFiles r = (,) <$> (foldr union empty <$> smaps) <*> (foldr union empty <$> amaps)
   where readSingle :: ImageDescFile -> IO (SurfaceMap,AnimMap)
-        readSingle f = imageDescToSurface f >>= imageDescToMaps f
+        readSingle f = imageDescToSurface r f >>= imageDescToMaps f
         maps :: IO [(SurfaceMap,AnimMap)]
         maps = getDescFilesInDir mediaDir >>= traverse readSingle
         smaps :: IO [SurfaceMap]
@@ -79,10 +82,17 @@ readAllDescFiles = (,) <$> (foldr union empty <$> smaps) <*> (foldr union empty 
         amaps :: IO [AnimMap]
         amaps = map snd <$> maps
 
-imageDescToSurface :: ImageDescFile -> IO Surface
-imageDescToSurface x = load (replaceExtension x ".png")
+loadImage :: SDLT.Renderer -> FilePath -> IO SDLT.Texture
+loadImage r f = do
+  texture <- imgLoadTexture r f
+  case texture of
+    Left e -> error $ "Could not load image \"" ++ f ++ "\": " ++ e
+    Right t -> return t
 
-imageDescToMaps :: ImageDescFile -> Surface -> IO (SurfaceMap,AnimMap)
+imageDescToSurface :: SDLT.Renderer -> ImageDescFile -> IO SDLT.Texture
+imageDescToSurface r x = loadImage r (replaceExtension x ".png")
+
+imageDescToMaps :: ImageDescFile -> SDLT.Texture -> IO (SurfaceMap,AnimMap)
 imageDescToMaps f s = (,) <$> (toSurfaceMap s <$> rSurfaceData) <*> rAnimData
   where rImageData :: IO [DataLine]
         rImageData = readImageData f
@@ -95,7 +105,7 @@ imageDescToMaps f s = (,) <$> (toSurfaceMap s <$> rSurfaceData) <*> rAnimData
                                   DataLineAnim i -> Just i
                                   _ -> Nothing) <$> rImageData)
 
-toSurfaceMap :: Surface -> ImageMap -> SurfaceMap
+toSurfaceMap :: SDLT.Texture -> ImageMap -> SurfaceMap
 toSurfaceMap s = ((s,) <$>)
 
 readImageData :: FilePath -> IO [DataLine]
