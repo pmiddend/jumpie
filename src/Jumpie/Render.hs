@@ -3,6 +3,7 @@ module Jumpie.Render(
   render,
   renderAll,
   optimizePlats,
+  RenderPositionMode(..),
   renderBox,
   RenderCommand(..)) where
 
@@ -19,6 +20,7 @@ import           Data.Map.Strict             ((!))
 import           Data.Maybe                  (fromJust, isNothing)
 import           Data.Ord                    ((<=))
 import           Data.String                 (String)
+import           Data.Tuple                  (snd)
 import           Data.Word                   (Word8)
 --import           Debug.Trace                 (trace)
 import           Graphics.UI.SDL.Video       (renderClear, setRenderDrawColor)
@@ -50,30 +52,33 @@ import           Text.Show                   (Show, show)
 
 type RGBColor = (Word8,Word8,Word8)
 
-data RenderCommand = FillScreen RGBColor | RenderSprite String PointInt | RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
+data RenderPositionMode = RenderPositionCenter | RenderPositionTopLeft deriving(Show,Eq)
+
+data RenderCommand = FillScreen RGBColor |
+                     RenderSprite String PointInt RenderPositionMode |
+                     RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
 
 -- Mutumorphismus zwischen optimizePlats und compressPlatforms
 optimizePlats :: [RenderCommand] -> [RenderCommand]
-optimizePlats ((p@(RenderSprite "platformr" _)):xs) = compressPlatforms [p] xs
+optimizePlats ((p@(RenderSprite "platformr" _ _)):xs) = compressPlatforms [p] xs
 optimizePlats (x:xs) = x:(optimizePlats xs)
 optimizePlats [] = []
 compressPlatforms :: [RenderCommand] -> [RenderCommand] -> [RenderCommand]
-compressPlatforms ns (q@(RenderSprite "platformm" _):ys) = compressPlatforms (ns ++ [q]) ys
-compressPlatforms ns (q@(RenderSprite "platforml" _):ys) = compressPlatform (ns ++ [q]) : optimizePlats ys
+compressPlatforms ns (q@(RenderSprite "platformm" _ _):ys) = compressPlatforms (ns ++ [q]) ys
+compressPlatforms ns (q@(RenderSprite "platforml" _ _):ys) = compressPlatform (ns ++ [q]) : optimizePlats ys
 compressPlatforms ns (a:as) =
   error $ "Invalid platform configuration, ends in \"" ++ show a ++ "\", next: " ++ show as ++ ", previous: " ++ show ns
 compressPlatforms _ [] =
   error "Invalid platform configuration, doesn't end in \"platforml\" element, ends in nothing"
 compressPlatform :: [RenderCommand] -> RenderCommand
---compressPlatform ((RenderSprite _ pos):ns) = RenderSprite ("platform" ++ show (length ns - 1)) pos
-compressPlatform ((RenderSprite _ pos):ns) = RenderSprite ("platform" ++ (show (length ns - 1))) pos
+compressPlatform ((RenderSprite _ pos mode):ns) = RenderSprite ("platform" ++ (show (length ns - 1))) pos mode
 compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
 renderGame :: GameData -> GameTicks -> GameState -> [RenderCommand]
 renderGame gd fs gs = FillScreen backgroundColor : concatMap (renderObject gd fs) (gsObjects gs)
 
 renderBox :: GameObject -> RenderCommand
-renderBox (ObjectBox (Box p t)) = RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p))
+renderBox (ObjectBox (Box p t)) = RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p)) RenderPositionTopLeft
 
 renderObject :: GameData -> GameTicks -> GameObject -> [RenderCommand]
 renderObject gd fs ob = case ob of
@@ -89,10 +94,14 @@ render gd ob = case ob of
   FillScreen (r,g,b) -> setRenderDrawColor (gdRenderer gd) r g b 255 >> renderClear (gdRenderer gd) >> return ()
   RenderLine _ _ -> return ()
   --RenderLine color lineSegment -> surfaceBresenham (gdScreen gd) color lineSegment
-  RenderSprite identifier pos -> blitAt gd identifier pos
+  RenderSprite identifier pos mode -> blitAt gd identifier pos mode
 
-blitAt :: GameData -> ImageId -> PointInt -> IO ()
-blitAt gd image pos = blitAtPosition ((gdSurfaces gd) ! image) pos (gdRenderer gd)
+blitAt :: GameData -> ImageId -> PointInt -> RenderPositionMode -> IO ()
+blitAt gd image pos mode = blitAtPosition imageData realPos (gdRenderer gd)
+  where realPos = case mode of
+          RenderPositionCenter -> pos - ((`div` 2) <$> (dimensions $ snd $ imageData))
+          RenderPositionTopLeft -> pos
+        imageData = (gdSurfaces gd) ! image
 
 boxTypeToSuffix :: BoxType -> String
 boxTypeToSuffix BoxMiddle = "m"
@@ -104,7 +113,7 @@ tickDiffSecs :: GameTicks -> GameTicks -> Double
 tickDiffSecs a b = fromIntegral (tickValue a - tickValue b) / (1000.0 * 1000.0 * 1000.0)
 
 renderPlayer :: GameData -> GameTicks -> Player -> [RenderCommand]
-renderPlayer gd ticks p = [RenderSprite playerImage (floor <$> pp)]
+renderPlayer gd ticks p = [RenderSprite playerImage (floor <$> pp) RenderPositionTopLeft]
   where pp = (playerPosition p) - ((vmult 0.5) $ toPointReal $ dimensions playerRect)
         playerImage = if playerMode p == Air
                       then ("player_fly_" ++ playerDirection)

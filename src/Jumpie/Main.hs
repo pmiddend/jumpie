@@ -5,9 +5,7 @@ import           Data.Bool             (Bool (..), (||))
 import           Data.Eq               ((==))
 import           Data.Function         (($))
 import           Data.List             (any, concatMap, lookup)
-import           Data.Map              ((!))
 import           Data.Maybe            (fromMaybe)
-import           Data.Tuple            (snd)
 import           Graphics.UI.SDL.Enum  (Scancode, scancodeEscape, scancodeLeft,
                                         scancodeRight, scancodeUp)
 import           Graphics.UI.SDL.Image (InitFlag (..), withImgInit)
@@ -18,16 +16,14 @@ import           Jumpie.FrameState     (FrameState (FrameState), fsCurrentTicks,
 import           Jumpie.Game           (processGame)
 import           Jumpie.GameConfig     (gcTimeMultiplier, screenHeight,
                                         screenWidth)
-import           Jumpie.GameData       (GameData (GameData), gdRenderer,
-                                        gdSurfaces)
+import           Jumpie.GameData       (GameData (GameData), gdRenderer)
 import           Jumpie.GameGeneration (generateGame)
 import           Jumpie.GameState      (GameState (GameState), gsGameover)
-import           Jumpie.Geometry.Point (Point2 (Point2), pX, pY)
-import           Jumpie.Geometry.Rect  (dimensions)
+import           Jumpie.Geometry.Point (Point2 (Point2))
 import           Jumpie.ImageData      (readAllDescFiles)
 import           Jumpie.Render         (RenderCommand (RenderSprite),
-                                        optimizePlats, render, renderAll,
-                                        renderGame)
+                                        RenderPositionMode (..), optimizePlats,
+                                        render, renderAll, renderGame)
 import           Jumpie.SDLHelper      (pollEvents, processKeydowns,
                                         renderFinish, withRenderer, withWindow)
 import           Jumpie.Time           (GameTicks, TimeDelta (TimeDelta),
@@ -49,9 +45,8 @@ gameoverMainLoop gameData gameState oldTicks = do
   if outerGameOver events
     then return ()
     else do
-      let gameoverRect = dimensions $ snd $ (gdSurfaces gameData) ! "gameover"
       renderAll gameData (optimizePlats (renderGame gameData oldTicks gameState))
-      render gameData $ RenderSprite "gameover" $ Point2 (screenWidth `div` 2 - pX gameoverRect `div` 2) (screenHeight `div` 2 - pY gameoverRect `div` 2)
+      render gameData $ RenderSprite "gameover" (Point2 (screenWidth `div` 2) (screenHeight `div` 2)) RenderPositionCenter
       renderFinish (gdRenderer gameData)
       gameoverMainLoop gameData gameState oldTicks
 
