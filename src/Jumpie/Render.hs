@@ -1,6 +1,7 @@
 module Jumpie.Render(
   renderGame,
-  sdlRenderAll,
+  render,
+  renderAll,
   optimizePlats,
   renderBox,
   RenderCommand(..)) where
@@ -21,7 +22,6 @@ import           Data.String                 (String)
 import           Data.Word                   (Word8)
 --import           Debug.Trace                 (trace)
 import           Graphics.UI.SDL.Video       (renderClear, setRenderDrawColor)
-import           Jumpie.FrameState           (FrameState, fsCurrentTicks)
 import           Jumpie.GameConfig           (backgroundColor)
 import           Jumpie.GameData             (GameData, gdAnims, gdRenderer,
                                               gdSurfaces)
@@ -69,23 +69,23 @@ compressPlatform :: [RenderCommand] -> RenderCommand
 compressPlatform ((RenderSprite _ pos):ns) = RenderSprite ("platform" ++ (show (length ns - 1))) pos
 compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
-renderGame :: GameData -> FrameState -> GameState -> [RenderCommand]
+renderGame :: GameData -> GameTicks -> GameState -> [RenderCommand]
 renderGame gd fs gs = FillScreen backgroundColor : concatMap (renderObject gd fs) (gsObjects gs)
 
 renderBox :: GameObject -> RenderCommand
 renderBox (ObjectBox (Box p t)) = RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p))
 
-renderObject :: GameData -> FrameState -> GameObject -> [RenderCommand]
+renderObject :: GameData -> GameTicks -> GameObject -> [RenderCommand]
 renderObject gd fs ob = case ob of
   ObjectPlayer p -> renderPlayer gd fs p
   ObjectSensorLine (SensorLine s) -> [RenderLine (255,0,0) (toIntLine s)]
   ObjectBox b -> [renderBox (ObjectBox b)]
 
-sdlRenderAll :: GameData -> [RenderCommand] -> IO ()
-sdlRenderAll gd = mapM_ (sdlRender gd)
+renderAll :: GameData -> [RenderCommand] -> IO ()
+renderAll gd = mapM_ (render gd)
 
-sdlRender :: GameData -> RenderCommand -> IO ()
-sdlRender gd ob = case ob of
+render :: GameData -> RenderCommand -> IO ()
+render gd ob = case ob of
   FillScreen (r,g,b) -> setRenderDrawColor (gdRenderer gd) r g b 255 >> renderClear (gdRenderer gd) >> return ()
   RenderLine _ _ -> return ()
   --RenderLine color lineSegment -> surfaceBresenham (gdScreen gd) color lineSegment
@@ -103,8 +103,8 @@ boxTypeToSuffix BoxSingleton = "s"
 tickDiffSecs :: GameTicks -> GameTicks -> Double
 tickDiffSecs a b = fromIntegral (tickValue a - tickValue b) / (1000.0 * 1000.0 * 1000.0)
 
-renderPlayer :: GameData -> FrameState -> Player -> [RenderCommand]
-renderPlayer gd fs p = [RenderSprite playerImage (floor <$> pp)]
+renderPlayer :: GameData -> GameTicks -> Player -> [RenderCommand]
+renderPlayer gd ticks p = [RenderSprite playerImage (floor <$> pp)]
   where pp = (playerPosition p) - ((vmult 0.5) $ toPointReal $ dimensions playerRect)
         playerImage = if playerMode p == Air
                       then ("player_fly_" ++ playerDirection)
@@ -113,7 +113,7 @@ renderPlayer gd fs p = [RenderSprite playerImage (floor <$> pp)]
                            else playerImageWalk (fromJust (playerWalkSince p))
         playerStands = abs ((pX . playerVelocity) p) <= 0.01
         playerImageWalk walkSince = animFrames playerWalkAnim !! (playerImageWalkIndex walkSince)
-        playerImageWalkIndex walkSince = (floor (((fsCurrentTicks fs) `tickDiffSecs` walkSince) / (fromIntegral (animFrameSwitch playerWalkAnim) / 1000.0))) `mod` (length (animFrames playerWalkAnim))
+        playerImageWalkIndex walkSince = (floor ((ticks `tickDiffSecs` walkSince) / (fromIntegral (animFrameSwitch playerWalkAnim) / 1000.0))) `mod` (length (animFrames playerWalkAnim))
         playerWalkAnim = (gdAnims gd) ! ("player_walk_" ++ playerDirection)
         playerDirection = if (pX . playerVelocity) p <= 0.0 then "left" else "right"
         (_,playerRect) = gdSurfaces gd ! playerImage

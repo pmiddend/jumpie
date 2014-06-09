@@ -3,33 +3,33 @@ module Main where
 import           Control.Monad         (return)
 import           Data.Bool             (Bool (..), (||))
 import           Data.Eq               ((==))
-import           Data.Function         (($), (.))
-import           Data.List             (any, concatMap, filter, lookup, map,
-                                        union, (\\))
+import           Data.Function         (($))
+import           Data.List             (any, concatMap, lookup)
+import           Data.Map              ((!))
 import           Data.Maybe            (fromMaybe)
-import           Data.String           (String)
-import           Data.Tuple            (fst)
-import           Foreign.C.String      (withCStringLen)
-import           Graphics.UI.SDL.Enum  (Scancode, eventTypeKeyDown,
-                                        eventTypeKeyUp, scancodeEscape,
-                                        scancodeLeft, scancodeRight, scancodeUp,
-                                        windowPosUndefined, windowPosUndefined)
+import           Data.Tuple            (snd)
+import           Graphics.UI.SDL.Enum  (Scancode, scancodeEscape, scancodeLeft,
+                                        scancodeRight, scancodeUp)
 import           Graphics.UI.SDL.Image (InitFlag (..), withImgInit)
 import           Graphics.UI.SDL.Types (Event (QuitEvent, KeyboardEvent),
-                                        Keysym (Keysym), Window)
-import           Graphics.UI.SDL.Video (createRenderer, createWindow,
-                                        renderPresent, renderSetLogicalSize)
+                                        Keysym (..))
 import           Jumpie.FrameState     (FrameState (FrameState), fsCurrentTicks,
                                         fsKeydowns, fsTimeDelta)
 import           Jumpie.Game           (processGame)
 import           Jumpie.GameConfig     (gcTimeMultiplier, screenHeight,
                                         screenWidth)
-import           Jumpie.GameData       (GameData (GameData), gdRenderer)
+import           Jumpie.GameData       (GameData (GameData), gdRenderer,
+                                        gdSurfaces)
 import           Jumpie.GameGeneration (generateGame)
 import           Jumpie.GameState      (GameState (GameState), gsGameover)
+import           Jumpie.Geometry.Point (Point2 (Point2), pX, pY)
+import           Jumpie.Geometry.Rect  (dimensions)
 import           Jumpie.ImageData      (readAllDescFiles)
-import           Jumpie.Render         (optimizePlats, renderGame, sdlRenderAll)
-import           Jumpie.SDLHelper      (pollEvents, withRenderer, withWindow)
+import           Jumpie.Render         (RenderCommand (RenderSprite),
+                                        optimizePlats, render, renderAll,
+                                        renderGame)
+import           Jumpie.SDLHelper      (pollEvents, processKeydowns,
+                                        renderFinish, withRenderer, withWindow)
 import           Jumpie.Time           (GameTicks, TimeDelta (TimeDelta),
                                         getTicks, tickValue)
 import           Jumpie.Types          (IncomingAction (..), Keydowns)
@@ -44,8 +44,19 @@ kdToAction sc = fromMaybe [] $ lookup
                 sc
                 [(scancodeLeft,[PlayerLeft]),(scancodeRight,[PlayerRight]),(scancodeUp,[PlayerJump])]
 
-outerMainLoop :: Keydowns -> GameData -> GameState -> GameTicks -> IO GameState
-outerMainLoop oldKeydowns gameData gameState oldTicks = do
+gameoverMainLoop gameData gameState oldTicks = do
+  events <- pollEvents
+  if outerGameOver events
+    then return ()
+    else do
+      let gameoverRect = dimensions $ snd $ (gdSurfaces gameData) ! "gameover"
+      renderAll gameData (optimizePlats (renderGame gameData oldTicks gameState))
+      render gameData $ RenderSprite "gameover" $ Point2 (screenWidth `div` 2 - pX gameoverRect `div` 2) (screenHeight `div` 2 - pY gameoverRect `div` 2)
+      renderFinish (gdRenderer gameData)
+      gameoverMainLoop gameData gameState oldTicks
+
+stageMainLoop :: Keydowns -> GameData -> GameState -> GameTicks -> IO GameState
+stageMainLoop oldKeydowns gameData gameState oldTicks = do
   events <- pollEvents
   newTicks <- getTicks
   if (outerGameOver events || gsGameover gameState)
@@ -60,21 +71,9 @@ outerMainLoop oldKeydowns gameData gameState oldTicks = do
         }
       let incomingActions = concatMap kdToAction newKeyDowns
       let newState = processGame frameState gameState incomingActions
-      sdlRenderAll gameData (optimizePlats (renderGame gameData frameState newState))
-      renderPresent (gdRenderer gameData)
-      outerMainLoop newKeyDowns gameData newState newTicks
-
-processKeydowns :: Keydowns -> [Event] -> Keydowns
-processKeydowns k es = (k \\ keyUps) `union` keyDowns
-  where keyUps = (map toKey  . filter isKeyUp) es
-        keyDowns = (map toKey  . filter isKeyDown) es
-        isKeyUp (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyUp
-        isKeyUp _ = False
-        isKeyDown (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyDown
-        isKeyDown _ = False
-        toKey e = case e of
-          KeyboardEvent _ _ _ _ _ (Keysym l _ _) -> l
-          _ -> undefined
+      renderAll gameData (optimizePlats (renderGame gameData (fsCurrentTicks frameState) newState))
+      renderFinish (gdRenderer gameData)
+      stageMainLoop newKeyDowns gameData newState newTicks
 
 -- Vorfilterung der Events, ob das Spiel beendet werden soll
 outerGameOver :: [Event] -> Bool
@@ -83,32 +82,20 @@ outerGameOver events = any outerGameOver' events
         outerGameOver' (KeyboardEvent _ _ _ _ _ (Keysym sc _ _)) = sc == scancodeEscape
         outerGameOver' _ = False
 
-screenAbsoluteWidth = 0
-screenAbsoluteHeight = 0
-windowFlags = 0
-
-myCreateWindow :: String -> IO Window
-myCreateWindow title = withCStringLen title $ \windowTitle -> do
-  createWindow
-    (fst windowTitle)
-    windowPosUndefined
-    windowPosUndefined
-    screenAbsoluteWidth
-    screenAbsoluteHeight
-    windowFlags
-
 main :: IO ()
 main =
   withImgInit [InitPNG] $ do
     withWindow "jumpie 0.1" $ \window -> do
       withRenderer window screenWidth screenHeight $ \renderer -> do
-        g <- getStdGen
         (images,anims) <- readAllDescFiles renderer
+        let gameData = GameData images anims renderer
+        g <- getStdGen
         ticks <- getTicks
-        lastGameState <- outerMainLoop
-                       []
-                       (GameData images anims renderer)
-                       (GameState (generateGame g) False)
-                       ticks
-        -- Gameover loop here
+        lastGameState <- stageMainLoop
+                         []
+                         gameData
+                         (GameState (generateGame g) False)
+                         ticks
+        newTicks <- getTicks
+        gameoverMainLoop gameData lastGameState newTicks
         putStrLn "Oh shit"

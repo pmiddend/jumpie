@@ -9,17 +9,22 @@ module Jumpie.SDLHelper(
   pollEvents,
   fromSDLRect,
   withWindow,
-  withRenderer
+  withRenderer,
+  renderFinish,
+  processKeydowns
   ) where
 
 import           Control.Monad         (return)
-import           Data.Function         (($))
+import           Data.Bool             (Bool (..))
+import           Data.Function         (($), (.))
 import           Data.Int              (Int)
+import           Data.List             (filter, map, union, (++), (\\))
 import           Data.Tuple            (fst)
 import           Foreign.Marshal.Array (allocaArray, peekArray)
 import           Foreign.Marshal.Utils (with)
 import           Graphics.UI.SDL.Enum  (eventActionGetEvent,
-                                        eventTypeFirstEvent, eventTypeLastEvent)
+                                        eventTypeFirstEvent, eventTypeKeyDown,
+                                        eventTypeKeyUp, eventTypeLastEvent)
 import           Graphics.UI.SDL.Event (peepEvents, pumpEvents)
 import qualified Graphics.UI.SDL.Types as SDLT
 import           Graphics.UI.SDL.Video (renderCopy)
@@ -33,23 +38,46 @@ import           Jumpie.Geometry.Rect  (Rect (Rect), dimensions)
 import           Jumpie.ImageData      (SurfaceData)
 --import           Jumpie.Monad                 (when_)
 import           Control.Exception     (bracket)
+import           Data.Eq               (Eq, (==))
 import           Data.String           (String)
 import           Foreign.C.String      (withCStringLen)
 import           Graphics.UI.SDL.Enum  (windowPosUndefined, windowPosUndefined)
 import           Graphics.UI.SDL.Types (Renderer, Window)
+import           Graphics.UI.SDL.Types (Event (KeyboardEvent))
 import           Graphics.UI.SDL.Video (createRenderer, createWindow,
                                         destroyRenderer, destroyWindow,
                                         renderPresent, renderSetLogicalSize)
-import           Jumpie.Types          (PointInt)
-import           Prelude               (RealFrac, floor, fromEnum, fromIntegral,
-                                        (*), (+), (-))
+import           Jumpie.Types          (Keydowns, PointInt)
+import           Prelude               (Num, RealFrac, error, floor, fromEnum,
+                                        fromIntegral, undefined, (*), (+), (-))
 import           System.IO             (IO)
+
+processKeydowns :: Keydowns -> [Event] -> Keydowns
+processKeydowns k es = (k \\ keyUps) `union` keyDowns
+  where keyUps = (map toKey  . filter isKeyUp) es
+        keyDowns = (map toKey  . filter isKeyDown) es
+        isKeyUp (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyUp
+        isKeyUp _ = False
+        isKeyDown (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyDown
+        isKeyDown _ = False
+        toKey e = case e of
+          KeyboardEvent _ _ _ _ _ (SDLT.Keysym l _ _) -> l
+          _ -> undefined
+
 
 screenAbsoluteWidth,screenAbsoluteHeight :: Int
 screenAbsoluteWidth = 0
 screenAbsoluteHeight = 0
 windowFlags :: Int
 windowFlags = 0
+
+errorIfNonZero :: (Num a,Eq a) => IO a -> String -> IO ()
+errorIfNonZero action s = do
+  result <- action
+  if result == 0 then return () else error $ s ++ " returned non-zero"
+
+renderFinish :: Renderer -> IO ()
+renderFinish renderer = renderPresent renderer
 
 withWindow :: String -> (Window -> IO a) -> IO a
 withWindow title callback = withCStringLen title $ \windowTitle ->
@@ -62,7 +90,7 @@ withRenderer window screenWidth screenHeight callback =
   let acquireResource = createRenderer window (-1) 0
       releaseResource = destroyRenderer
   in bracket acquireResource releaseResource $ \renderer -> do
-    renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)
+    errorIfNonZero (renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)) "renderSetLogicalSize"
     callback renderer
 {-
 createPixel :: Surface -> (Word8,Word8,Word8) -> IO Pixel
@@ -93,13 +121,14 @@ fillSurface screen color = do
   _ <- fillRect screen (Just cr) pixel
   return ()
 -}
-renderSprite r t srcrect dstrect = with srcrect $ \srcrectptr -> with dstrect $ \dstrectptr -> renderCopy r t srcrectptr dstrectptr
+renderSprite :: SDLT.Renderer -> SDLT.Texture -> SDLT.Rect -> SDLT.Rect -> IO ()
+renderSprite r t srcrect dstrect = with srcrect $ \srcrectptr -> with dstrect $ \dstrectptr ->
+  errorIfNonZero (renderCopy r t srcrectptr dstrectptr) "renderCopy"
 
 blitAtPosition :: SurfaceData -> PointInt -> SDLT.Renderer -> IO ()
 blitAtPosition (srcSurface,srcRect) pos renderer = do
   let destRect = Rect pos (pos + (dimensions srcRect))
   renderSprite renderer srcSurface (toSDLRect srcRect) (toSDLRect destRect)
-  return ()
 
 eventArrayStaticSize :: Int
 eventArrayStaticSize = 128
