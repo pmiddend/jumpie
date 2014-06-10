@@ -1,29 +1,43 @@
-module Jumpie.Game(processGame) where
+module Jumpie.Game(processGameObjects) where
 
-import Control.Applicative((<|>))
-import Data.Bool((&&),(||),not,Bool(False,True))
-import Data.Eq((==))
-import Data.Function((.),($))
-import Data.List(concatMap,map,filter,(++),elem,find)
-import Data.Maybe(Maybe(..),isNothing,isJust,fromJust)
-import Data.Monoid(First(First),getFirst,mconcat)
-import Data.Ord((<),(>=),(>),min)
-import Jumpie.GameConfig(gcPlayerMaxSpeed,gcAcc,gcFrc,gcWSSize, gcPlayerHeight, gcGrv,gcDec,gcAir,gcJmp,screenHeight)
-import Jumpie.Geometry.Intersection(rectLineSegmentIntersects)
-import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
-import Jumpie.Geometry.Point(Point2(..))
-import Jumpie.Geometry.Rect(top,center,right,left,bottom)
-import Jumpie.Geometry.Utility(clampAbs)
-import Jumpie.Maybe(ifMaybe)
-import Jumpie.GameState(GameState(GameState),gsObjects)
-import Jumpie.GameObject(GameObject(..),Player(Player),playerMode,PlayerMode(..),isBox,SensorLine(SensorLine),playerPosition,Box(Box),playerVelocity,playerWalkSince,boxPosition,isPlayer)
-import Jumpie.FrameState(FrameState,fsTimeDelta,fsCurrentTicks)
-import Jumpie.Types(IncomingAction(..),LineSegmentReal,PointReal,Real)
-import Jumpie.Time(TimeDelta,timeDelta)
-import Prelude(Double,(+),(-),(*),abs,signum,fromIntegral)
+import           Control.Applicative          ((<|>))
+import           Data.Bool                    (Bool (False, True), not, (&&),
+                                               (||))
+import           Data.Eq                      ((==))
+import           Data.Function                (($), (.))
+import           Data.List                    (concatMap, elem, filter, find,
+                                               map, (++))
+import           Data.Maybe                   (Maybe (..), fromJust, isJust,
+                                               isNothing)
+import           Data.Monoid                  (First (First), getFirst, mconcat)
+import           Data.Ord                     (min, (<), (>), (>=))
+import           Jumpie.FrameState            (FrameState, fsCurrentTicks,
+                                               fsTimeDelta)
+import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
+                                               gcGrv, gcJmp, gcPlayerHeight,
+                                               gcPlayerMaxSpeed, gcStarLifetime,
+                                               gcWSSize, screenHeight)
+import           Jumpie.GameObject            (Box (Box), GameObject (..),
+                                               Player (Player), PlayerMode (..),
+                                               SensorLine (SensorLine),
+                                               boxPosition, isBox, isPlayer,
+                                               playerMode, playerPosition,
+                                               playerVelocity, playerWalkSince)
+import           Jumpie.GameState             (GameState (GameState), gsObjects)
+import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
+import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
+import           Jumpie.Geometry.Point        (Point2 (..))
+import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
+import           Jumpie.Geometry.Utility      (clampAbs)
+import           Jumpie.Maybe                 (ifMaybe)
+import           Jumpie.Time                  (TimeDelta, timeDelta)
+import           Jumpie.Types                 (IncomingAction (..),
+                                               LineSegmentReal, PointReal, Real)
+import           Prelude                      (Double, abs, fromIntegral,
+                                               signum, (*), (+), (-))
 
-processGame :: FrameState -> GameState -> [IncomingAction] -> GameState
-processGame fs gs actions = GameState newGameObjects (testGameOver newGameObjects)
+processGameObjects :: FrameState -> GameState -> [IncomingAction] -> GameState
+processGameObjects fs gs actions = GameState newGameObjects (testGameOver newGameObjects)
   where newGameObjects = concatMap (processGameObject fs (gsObjects gs) actions) (gsObjects gs)
 
 testGameOver :: [GameObject] -> Bool
@@ -36,6 +50,9 @@ processGameObject :: FrameState -> [GameObject] -> [IncomingAction] -> GameObjec
 processGameObject fs os ias o = case o of
   ObjectPlayer p -> processPlayerObject fs os ias p
   ObjectBox b -> [ObjectBox b]
+  ObjectStar b -> if starInception + gcStarLifetime > (fsCurrentTicks fs)
+                  then []
+                  else [ObjectStar b]
   ObjectSensorLine _ -> []
 
 processPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
@@ -51,12 +68,12 @@ lineCollision boxes l = (getFirst . mconcat . map (First . (collides l))) boxes
         collides _ _ = Nothing
 
 data Sensors = Sensors {
-  sensW :: LineSegment PointReal,
-  sensFL :: LineSegment PointReal,
-  sensFR :: LineSegment PointReal,
-  sensCL :: LineSegment PointReal,
-  sensCR :: LineSegment PointReal,
-  sensWCollision :: Maybe GameObject,
+  sensW           :: LineSegment PointReal,
+  sensFL          :: LineSegment PointReal,
+  sensFR          :: LineSegment PointReal,
+  sensCL          :: LineSegment PointReal,
+  sensCR          :: LineSegment PointReal,
+  sensWCollision  :: Maybe GameObject,
   sensFLCollision :: Maybe GameObject,
   sensFRCollision :: Maybe GameObject,
   sensCLCollision :: Maybe GameObject,

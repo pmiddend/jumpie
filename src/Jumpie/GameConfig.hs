@@ -3,6 +3,7 @@ module Jumpie.GameConfig(
   gcTileSize,
   gcPlayerHeight,
   gcPlayerMaxSpeed,
+  gcStars,
   gcDec,
   gcAir,
   gcGrv,
@@ -14,24 +15,24 @@ module Jumpie.GameConfig(
   gcTimeMultiplier,
   screenWidth,
   screenHeight,
-  screenBpp,
   mediaDir,
-  backgroundColor
+  backgroundColor,
+  gcStarLifetime
   ) where
 
-import Jumpie.Types(Real)
-import Prelude(fromIntegral,(/),(-),div,(*),(+))
-import Data.Int(Int)
-import Data.String(String)
-import Data.Word(Word8)
+import           Data.Int     (Int)
+import           Data.String  (String)
+import           Data.Word    (Word8)
+import           Jumpie.Time  (GameTicks, fromSeconds)
+import           Jumpie.Types (Real)
+import           Prelude      (div, fromIntegral, (*), (+), (-), (/))
 
 backgroundColor :: (Word8,Word8,Word8)
 backgroundColor = (94,129,162)
 
-screenWidth,screenHeight,screenBpp :: Int
+screenWidth,screenHeight :: Int
 screenWidth = 1200
 screenHeight = 400
-screenBpp = 32
 mediaDir :: String
 mediaDir = "media"
 
@@ -40,6 +41,9 @@ gcPlatMaxLength = 5
 
 gcPlatCount :: Int
 gcPlatCount = 15
+
+gcStars :: Int
+gcStars = 2
 
 gcWSSize :: Real
 gcWSSize = 10.0
@@ -78,3 +82,6 @@ gcDec = 0.5
 
 gcTileSize :: Int
 gcTileSize = 35
+
+gcStarLifetime :: GameTicks
+gcStarLifetime = fromSeconds 3

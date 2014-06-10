@@ -31,8 +31,9 @@ import           Jumpie.GameObject           (Box (Box), BoxType (..),
                                               GameObject (..), Player,
                                               PlayerMode (..),
                                               SensorLine (SensorLine),
-                                              playerMode, playerPosition,
-                                              playerVelocity, playerWalkSince)
+                                              Star (..), playerMode,
+                                              playerPosition, playerVelocity,
+                                              playerWalkSince)
 import           Jumpie.GameState            (GameState, gsObjects)
 import           Jumpie.Geometry.LineSegment (LineSegment)
 import           Jumpie.Geometry.Point       (Point2 (..), vmult)
@@ -77,14 +78,19 @@ compressPlatform _ = error "compressPlatform given something other than RenderSp
 renderGame :: GameData -> GameTicks -> GameState -> [RenderCommand]
 renderGame gd fs gs = FillScreen backgroundColor : concatMap (renderObject gd fs) (gsObjects gs)
 
-renderBox :: GameObject -> RenderCommand
-renderBox (ObjectBox (Box p t)) = RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p)) RenderPositionTopLeft
+renderBox :: Box -> RenderCommand
+renderBox (Box p t) =
+  RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p)) RenderPositionTopLeft
+
+renderStar :: Star -> RenderCommand
+renderStar (Star pos _) = RenderSprite "star" (floor <$> pos) RenderPositionCenter
 
 renderObject :: GameData -> GameTicks -> GameObject -> [RenderCommand]
 renderObject gd fs ob = case ob of
   ObjectPlayer p -> renderPlayer gd fs p
   ObjectSensorLine (SensorLine s) -> [RenderLine (255,0,0) (toIntLine s)]
-  ObjectBox b -> [renderBox (ObjectBox b)]
+  ObjectBox b -> [renderBox b]
+  ObjectStar s -> [renderStar s]
 
 renderAll :: GameData -> [RenderCommand] -> IO ()
 renderAll gd = mapM_ (render gd)

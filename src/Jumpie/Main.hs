@@ -1,6 +1,6 @@
 module Main where
 
-import           Control.Monad         (return)
+import           Control.Monad         (return, unless)
 import           Data.Bool             (Bool (..), (||))
 import           Data.Eq               ((==))
 import           Data.Function         (($))
@@ -13,7 +13,7 @@ import           Graphics.UI.SDL.Types (Event (QuitEvent, KeyboardEvent),
                                         Keysym (..))
 import           Jumpie.FrameState     (FrameState (FrameState), fsCurrentTicks,
                                         fsKeydowns, fsTimeDelta)
-import           Jumpie.Game           (processGame)
+import           Jumpie.Game           (processGameObjects)
 import           Jumpie.GameConfig     (gcTimeMultiplier, screenHeight,
                                         screenWidth)
 import           Jumpie.GameData       (GameData (GameData), gdRenderer)
@@ -33,25 +33,19 @@ import           Prelude               (Double, Fractional, Integral, abs, div,
                                         error, floor, fromIntegral, mod,
                                         undefined, (*), (+), (-), (/))
 import           System.IO             (IO, putStrLn)
-import           System.Random         (getStdGen)
+import           System.Random         (RandomGen, getStdGen)
 
-kdToAction :: Scancode -> [IncomingAction]
-kdToAction sc = fromMaybe [] $ lookup
-                sc
-                [(scancodeLeft,[PlayerLeft]),(scancodeRight,[PlayerRight]),(scancodeUp,[PlayerJump])]
-
+gameoverMainLoop :: GameData -> GameState -> GameTicks -> IO ()
 gameoverMainLoop gameData gameState oldTicks = do
   events <- pollEvents
-  if outerGameOver events
-    then return ()
-    else do
-      renderAll gameData (optimizePlats (renderGame gameData oldTicks gameState))
-      render gameData $ RenderSprite "gameover" (Point2 (screenWidth `div` 2) (screenHeight `div` 2)) RenderPositionCenter
-      renderFinish (gdRenderer gameData)
-      gameoverMainLoop gameData gameState oldTicks
+  unless (outerGameOver events) $ do
+    renderAll gameData (optimizePlats (renderGame gameData oldTicks gameState))
+    render gameData $ RenderSprite "gameover" (Point2 (screenWidth `div` 2) (screenHeight `div` 2)) RenderPositionCenter
+    renderFinish (gdRenderer gameData)
+    gameoverMainLoop gameData gameState oldTicks
 
-stageMainLoop :: Keydowns -> GameData -> GameState -> GameTicks -> IO GameState
-stageMainLoop oldKeydowns gameData gameState oldTicks = do
+stageMainLoop :: RandomGen r => Keydowns -> GameData -> GameState -> GameTicks -> r -> IO GameState
+stageMainLoop oldKeydowns gameData gameState oldTicks randomGen = do
   events <- pollEvents
   newTicks <- getTicks
   if (outerGameOver events || gsGameover gameState)
@@ -65,10 +59,16 @@ stageMainLoop oldKeydowns gameData gameState oldTicks = do
         fsKeydowns = newKeyDowns
         }
       let incomingActions = concatMap kdToAction newKeyDowns
-      let newState = processGame frameState gameState incomingActions
+      let newState = processGameObjects frameState gameState incomingActions
       renderAll gameData (optimizePlats (renderGame gameData (fsCurrentTicks frameState) newState))
       renderFinish (gdRenderer gameData)
-      stageMainLoop newKeyDowns gameData newState newTicks
+      stageMainLoop newKeyDowns gameData newState newTicks randomGen
+
+kdToAction :: Scancode -> [IncomingAction]
+kdToAction sc = fromMaybe [] $ lookup
+                sc
+                [(scancodeLeft,[PlayerLeft]),(scancodeRight,[PlayerRight]),(scancodeUp,[PlayerJump])]
+
 
 -- Vorfilterung der Events, ob das Spiel beendet werden soll
 outerGameOver :: [Event] -> Bool
@@ -91,6 +91,7 @@ main =
                          gameData
                          (GameState (generateGame g) False)
                          ticks
+                         g
         newTicks <- getTicks
         gameoverMainLoop gameData lastGameState newTicks
         putStrLn "Oh shit"
