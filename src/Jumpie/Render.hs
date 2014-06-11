@@ -75,63 +75,63 @@ compressPlatform :: [RenderCommand] -> RenderCommand
 compressPlatform ((RenderSprite _ pos mode):ns) = RenderSprite ("platform" ++ (show (length ns - 1))) pos mode
 compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
-renderGame :: GameData -> GameTicks -> GameState -> [RenderCommand]
-renderGame gd fs gs = FillScreen backgroundColor : concatMap (renderObject gd fs) (gsObjects gs)
+renderGame :: GameStateM [RenderCommand]
+renderGame = do
+  gs <- sgsGameState
+  renderedObjects <- concatMapM renderObject (gsObjects gs)
+  return $ FillScreen backgroundColor : renderedObjects
 
-renderBox :: Box -> RenderCommand
-renderBox (Box p t) =
-  RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p)) RenderPositionTopLeft
+renderBox :: Box -> GameStateM [RenderCommand]
+renderBox (Box p t) = return [RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p)) RenderPositionTopLeft]
 
-renderStar :: Star -> RenderCommand
-renderStar (Star pos _) = RenderSprite "star" (floor <$> pos) RenderPositionCenter
+renderStar :: Star -> GameStateM [RenderCommand]
+renderStar (Star pos _) = return [RenderSprite "star" (floor <$> pos) RenderPositionCenter]
 
-renderObject :: GameData -> GameTicks -> GameObject -> [RenderCommand]
-renderObject gd fs ob = case ob of
-  ObjectPlayer p -> renderPlayer gd fs p
-  ObjectSensorLine (SensorLine s) -> [RenderLine (255,0,0) (toIntLine s)]
-  ObjectBox b -> [renderBox b]
-  ObjectStar s -> [renderStar s]
+renderObject :: GameObject -> GameStateM [RenderCommand]
+renderObject ob = case ob of
+  ObjectPlayer p -> renderPlayer p
+  ObjectSensorLine (SensorLine s) -> return $ [RenderLine (255,0,0) (toIntLine s)]
+  ObjectBox b -> renderBox b
+  ObjectStar s -> renderStar s
 
-renderAll :: GameData -> [RenderCommand] -> IO ()
-renderAll gd = mapM_ (render gd)
+renderAll :: [RenderCommand] -> GameStateM ()
+renderAll = mapM_ render
 
-render :: GameData -> RenderCommand -> IO ()
-render gd ob = case ob of
-  FillScreen (r,g,b) -> setRenderDrawColor (gdRenderer gd) r g b 255 >> renderClear (gdRenderer gd) >> return ()
+render :: RenderCommand -> GameStateM ()
+render ob = case ob of
+  FillScreen (r,g,b) -> do
+    gd <- sgsGameData
+    liftIO $ setRenderDrawColor (gdRenderer gd) r g b 255
+    liftIO $ renderClear (gdRenderer gd)
   RenderLine _ _ -> return ()
   --RenderLine color lineSegment -> surfaceBresenham (gdScreen gd) color lineSegment
-  RenderSprite identifier pos mode -> blitAt gd identifier pos mode
+  RenderSprite identifier pos mode -> blitAt identifier pos mode
 
-blitAt :: GameData -> ImageId -> PointInt -> RenderPositionMode -> IO ()
-blitAt gd image pos mode = blitAtPosition imageData realPos (gdRenderer gd)
-  where realPos = case mode of
-          RenderPositionCenter -> pos - ((`div` 2) <$> (dimensions $ snd $ imageData))
-          RenderPositionTopLeft -> pos
-        imageData = (gdSurfaces gd) ! image
+blitAt :: ImageId -> PointInt -> RenderPositionMode -> GameStateM ()
+blitAt image pos mode = do
+  gd <- sgsGameData
+  let imageData = (gdSurfaces gd) ! image
+      realPos = case mode of
+        RenderPositionCenter -> pos - ((`div` 2) <$> (dimensions $ snd $ imageData))
+        RenderPositionTopLeft -> pos
+  blitAtPosition imageData realPos (gdRenderer gd)
 
-boxTypeToSuffix :: BoxType -> String
-boxTypeToSuffix BoxMiddle = "m"
-boxTypeToSuffix BoxLeft = "l"
-boxTypeToSuffix BoxRight = "r"
-boxTypeToSuffix BoxSingleton = "s"
-
-tickDiffSecs :: GameTicks -> GameTicks -> Double
-tickDiffSecs a b = fromIntegral (tickValue a - tickValue b) / (1000.0 * 1000.0 * 1000.0)
-
-renderPlayer :: GameData -> GameTicks -> Player -> [RenderCommand]
-renderPlayer gd ticks p = [RenderSprite playerImage (floor <$> pp) RenderPositionTopLeft]
-  where pp = (playerPosition p) - ((vmult 0.5) $ toPointReal $ dimensions playerRect)
-        playerImage = if playerMode p == Air
+renderPlayer :: Player -> [RenderCommand]
+renderPlayer p = do
+  gd <- sgsGameData
+  ticks <- sgsCurrentTicks
+  let playerImage = if playerMode p == Air
                       then ("player_fly_" ++ playerDirection)
                       else if playerStands || isNothing (playerWalkSince p)
                            then "player_stand"
                            else playerImageWalk (fromJust (playerWalkSince p))
-        playerStands = abs ((pX . playerVelocity) p) <= 0.01
-        playerImageWalk walkSince = animFrames playerWalkAnim !! (playerImageWalkIndex walkSince)
-        playerImageWalkIndex walkSince = (floor ((ticks `tickDiffSecs` walkSince) / (fromIntegral (animFrameSwitch playerWalkAnim) / 1000.0))) `mod` (length (animFrames playerWalkAnim))
-        playerWalkAnim = (gdAnims gd) ! ("player_walk_" ++ playerDirection)
-        playerDirection = if (pX . playerVelocity) p <= 0.0 then "left" else "right"
-        (_,playerRect) = gdSurfaces gd ! playerImage
+      playerStands = abs ((pX . playerVelocity) p) <= 0.01
+      playerImageWalk walkSince = animFrames playerWalkAnim !! (playerImageWalkIndex walkSince)
+      playerImageWalkIndex walkSince = (floor ((ticks `tickDiffSecs` walkSince) / (fromIntegral (animFrameSwitch playerWalkAnim) / 1000.0))) `mod` (length (animFrames playerWalkAnim))
+      playerWalkAnim = (gdAnims gd) ! ("player_walk_" ++ playerDirection)
+      playerDirection = if (pX . playerVelocity) p <= 0.0 then "left" else "right"
+      (_,playerRect) = gdSurfaces gd ! playerImage
+  return [RenderSprite playerImage (floor <$> pp) RenderPositionTopLeft]
 
 {-
 drawCross :: Surface -> Point2 Int -> IO ()
@@ -149,3 +149,11 @@ toIntLine = fmap (fmap floor)
 toPointReal :: Integral a => Point2 a -> PointReal
 toPointReal p = fromIntegral <$> p
 
+tickDiffSecs :: GameTicks -> GameTicks -> Double
+tickDiffSecs a b = fromIntegral (tickValue a - tickValue b) / (1000.0 * 1000.0 * 1000.0)
+
+boxTypeToSuffix :: BoxType -> String
+boxTypeToSuffix BoxMiddle = "m"
+boxTypeToSuffix BoxLeft = "l"
+boxTypeToSuffix BoxRight = "r"
+boxTypeToSuffix BoxSingleton = "s"

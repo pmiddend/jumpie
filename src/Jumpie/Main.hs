@@ -18,7 +18,7 @@ import           Jumpie.GameConfig     (gcTimeMultiplier, screenHeight,
                                         screenWidth)
 import           Jumpie.GameData       (GameData (GameData), gdRenderer)
 import           Jumpie.GameGeneration (generateGame)
-import           Jumpie.GameState      (GameState (GameState), gsGameover)
+import           Jumpie.GameState      (GameState (GameState), gsGameover,GameStateM)
 import           Jumpie.Geometry.Point (Point2 (Point2))
 import           Jumpie.ImageData      (readAllDescFiles)
 import           Jumpie.Render         (RenderCommand (RenderSprite),
@@ -35,10 +35,12 @@ import           Prelude               (Double, Fractional, Integral, abs, div,
 import           System.IO             (IO, putStrLn)
 import           System.Random         (RandomGen, getStdGen)
 
-gameoverMainLoop :: GameData -> GameState -> GameTicks -> IO ()
-gameoverMainLoop gameData gameState oldTicks = do
-  events <- pollEvents
+gameoverMainLoop :: GameTicks -> GameStateM ()
+gameoverMainLoop oldTicks = do
+  events <- liftIO pollEvents
   unless (outerGameOver events) $ do
+    gameData <- sgsGameData
+    gameState <- sgsGameState
     renderAll gameData (optimizePlats (renderGame gameData oldTicks gameState))
     render gameData $ RenderSprite "gameover" (Point2 (screenWidth `div` 2) (screenHeight `div` 2)) RenderPositionCenter
     renderFinish (gdRenderer gameData)

@@ -11,7 +11,8 @@ module Jumpie.SDLHelper(
   withWindow,
   withRenderer,
   renderFinish,
-  processKeydowns
+  processKeydowns,
+  renderClear
   ) where
 
 import           Control.Monad         (return)
@@ -27,7 +28,7 @@ import           Graphics.UI.SDL.Enum  (eventActionGetEvent,
                                         eventTypeKeyUp, eventTypeLastEvent)
 import           Graphics.UI.SDL.Event (peepEvents, pumpEvents)
 import qualified Graphics.UI.SDL.Types as SDLT
-import           Graphics.UI.SDL.Video (renderCopy)
+import qualified Graphics.UI.SDL.Video as SDLV
 --import           Jumpie.Bresenham             (bresenham)
 --import           Jumpie.Debug                 (traceShowId)
 --import           Jumpie.Geometry.Intersection (lineSegmentInsideRect)
@@ -37,6 +38,7 @@ import           Jumpie.Geometry.Rect  (Rect (Rect), dimensions)
 --import           Jumpie.Geometry.Rect         (inside)
 import           Jumpie.ImageData      (SurfaceData)
 --import           Jumpie.Monad                 (when_)
+import Control.Monad((>>))
 import           Control.Exception     (bracket)
 import           Data.Eq               (Eq, (==))
 import           Data.String           (String)
@@ -51,6 +53,9 @@ import           Jumpie.Types          (Keydowns, PointInt)
 import           Prelude               (Num, RealFrac, error, floor, fromEnum,
                                         fromIntegral, undefined, (*), (+), (-))
 import           System.IO             (IO)
+
+renderClear :: Renderer -> IO ()
+renderClear renderer = SDLV.renderClear renderer >> return ()
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
 processKeydowns k es = (k \\ keyUps) `union` keyDowns
@@ -123,7 +128,7 @@ fillSurface screen color = do
 -}
 renderSprite :: SDLT.Renderer -> SDLT.Texture -> SDLT.Rect -> SDLT.Rect -> IO ()
 renderSprite r t srcrect dstrect = with srcrect $ \srcrectptr -> with dstrect $ \dstrectptr ->
-  errorIfNonZero (renderCopy r t srcrectptr dstrectptr) "renderCopy"
+  errorIfNonZero (SDLV.renderCopy r t srcrectptr dstrectptr) "renderCopy"
 
 blitAtPosition :: SurfaceData -> PointInt -> SDLT.Renderer -> IO ()
 blitAtPosition (srcSurface,srcRect) pos renderer = do
