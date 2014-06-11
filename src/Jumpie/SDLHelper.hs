@@ -24,7 +24,8 @@ import           Foreign.Marshal.Array (allocaArray, peekArray)
 import           Foreign.Marshal.Utils (with)
 import           Graphics.UI.SDL.Enum  (eventActionGetEvent,
                                         eventTypeFirstEvent, eventTypeKeyDown,
-                                        eventTypeKeyUp, eventTypeLastEvent)
+                                        eventTypeKeyUp, eventTypeLastEvent,
+                                        windowFlagResizable)
 import           Graphics.UI.SDL.Event (peepEvents, pumpEvents)
 import qualified Graphics.UI.SDL.Types as SDLT
 import           Graphics.UI.SDL.Video (renderCopy)
@@ -69,7 +70,7 @@ screenAbsoluteWidth,screenAbsoluteHeight :: Int
 screenAbsoluteWidth = 0
 screenAbsoluteHeight = 0
 windowFlags :: Int
-windowFlags = 0
+windowFlags = windowFlagResizable
 
 errorIfNonZero :: (Num a,Eq a) => IO a -> String -> IO ()
 errorIfNonZero action s = do
