@@ -22,7 +22,7 @@ import           Jumpie.GameObject            (Box (Box), GameObject (..),
                                                SensorLine (SensorLine),
                                                boxPosition, isBox, isPlayer,
                                                playerMode, playerPosition,
-                                               playerVelocity, playerWalkSince)
+                                               playerVelocity, playerWalkSince,starInception)
 import           Jumpie.GameState             (GameState (GameState), gsObjects)
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
 import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
@@ -50,7 +50,7 @@ processGameObject :: FrameState -> [GameObject] -> [IncomingAction] -> GameObjec
 processGameObject fs os ias o = case o of
   ObjectPlayer p -> processPlayerObject fs os ias p
   ObjectBox b -> [ObjectBox b]
-  ObjectStar b -> if starInception + gcStarLifetime > (fsCurrentTicks fs)
+  ObjectStar b -> if starInception b + gcStarLifetime > (fsCurrentTicks fs)
                   then []
                   else [ObjectStar b]
   ObjectSensorLine _ -> []

@@ -84,4 +84,4 @@ gcTileSize :: Int
 gcTileSize = 35
 
 gcStarLifetime :: GameTicks
-gcStarLifetime = fromSeconds 3
+gcStarLifetime = fromSeconds (3 :: Int)
