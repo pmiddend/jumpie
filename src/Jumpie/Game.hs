@@ -1,64 +1,68 @@
-module Jumpie.Game(processGameObjects) where
+module Jumpie.Game(processGameObjects,testGameOver) where
 
-import           Control.Applicative          ((<|>))
+import           Control.Applicative          ((<$>), (<|>))
+import           Control.Monad                (return)
+import           Control.Monad.State.Strict   (get)
 import           Data.Bool                    (Bool (False, True), not, (&&),
                                                (||))
 import           Data.Eq                      ((==))
 import           Data.Function                (($), (.))
-import           Data.List                    (concatMap, elem, filter, find,
-                                               map, (++))
+import           Data.List                    (elem, filter, find, map, (++))
 import           Data.Maybe                   (Maybe (..), fromJust, isJust,
                                                isNothing)
 import           Data.Monoid                  (First (First), getFirst, mconcat)
 import           Data.Ord                     (min, (<), (>), (>=))
-import           Jumpie.FrameState            (FrameState, fsCurrentTicks,
-                                               fsTimeDelta)
 import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
                                                gcGrv, gcJmp, gcPlayerHeight,
                                                gcPlayerMaxSpeed, gcStarLifetime,
                                                gcWSSize, screenHeight)
+import           Jumpie.GameData              (GameDataM, gdCurrentTicks,
+                                               gdTimeDelta)
 import           Jumpie.GameObject            (Box (Box), GameObject (..),
                                                Player (Player), PlayerMode (..),
                                                SensorLine (SensorLine),
                                                boxPosition, isBox, isPlayer,
                                                playerMode, playerPosition,
-                                               playerVelocity, playerWalkSince,starInception)
-import           Jumpie.GameState             (GameState (GameState), gsObjects)
+                                               playerVelocity, playerWalkSince,
+                                               starInception)
+import           Jumpie.GameState             (GameState, gsObjects)
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
 import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
 import           Jumpie.Geometry.Point        (Point2 (..))
 import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
 import           Jumpie.Geometry.Utility      (clampAbs)
 import           Jumpie.Maybe                 (ifMaybe)
+import           Jumpie.Monad                 (concatMapM)
 import           Jumpie.Time                  (TimeDelta, timeDelta)
 import           Jumpie.Types                 (IncomingAction (..),
                                                LineSegmentReal, PointReal, Real)
 import           Prelude                      (Double, abs, fromIntegral,
                                                signum, (*), (+), (-))
 
-processGameObjects :: FrameState -> GameState -> [IncomingAction] -> GameState
-processGameObjects fs gs actions = GameState newGameObjects (testGameOver newGameObjects)
-  where newGameObjects = concatMap (processGameObject fs (gsObjects gs) actions) (gsObjects gs)
+processGameObjects :: GameState -> [IncomingAction] -> GameDataM [GameObject]
+processGameObjects gs actions = concatMapM (processGameObject gs actions) (gsObjects gs)
 
-testGameOver :: [GameObject] -> Bool
-testGameOver os = case find isPlayer os of
+testGameOver :: GameState -> Bool
+testGameOver os = case find isPlayer (gsObjects os) of
   Nothing -> True
   Just (ObjectPlayer p) -> (pY . playerPosition) p > fromIntegral screenHeight
   Just _ -> True
 
-processGameObject :: FrameState -> [GameObject] -> [IncomingAction] -> GameObject -> [GameObject]
-processGameObject fs os ias o = case o of
-  ObjectPlayer p -> processPlayerObject fs os ias p
-  ObjectBox b -> [ObjectBox b]
-  ObjectStar b -> if starInception b + gcStarLifetime > (fsCurrentTicks fs)
-                  then []
-                  else [ObjectStar b]
-  ObjectSensorLine _ -> []
+processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM [GameObject]
+processGameObject gs ias o = case o of
+  ObjectPlayer p -> processPlayerObject gs ias p
+  ObjectBox b -> return [ObjectBox b]
+  ObjectStar b -> do
+    currentTicks <- gdCurrentTicks <$> get
+    if starInception b + gcStarLifetime > currentTicks
+      then return []
+      else return [ObjectStar b]
+  ObjectSensorLine _ -> return []
 
-processPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
-processPlayerObject fs os ias p = case playerMode p of
-  Ground -> processGroundPlayerObject fs os ias p
-  Air -> processAirPlayerObject fs os ias p
+processPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM [GameObject]
+processPlayerObject gs ias p = case playerMode p of
+  Ground -> processGroundPlayerObject gs ias p
+  Air -> processAirPlayerObject gs ias p
 
 -- Testet, ob ein LineSegment (ein Sensor) mit der Umgebung kollidiert
 lineCollision :: [GameObject] -> LineSegmentReal -> Maybe GameObject
@@ -103,11 +107,11 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
         cSLCollision = lineCollision boxes cSL
         cSRCollision = lineCollision boxes cSR
 
-processGroundPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
-processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-        sensors = applySensors os (playerPosition p) 4.0
-        t = fsTimeDelta fs
+processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM [GameObject]
+processGroundPlayerObject gs ias p = do
+  t <- gdTimeDelta <$> get
+  let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
+        sensors = applySensors (gsObjects gs) (playerPosition p) 4.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
         newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
                         then Air
@@ -140,12 +144,14 @@ processGroundPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
           playerVelocity = newPlayerVelocity,
           playerWalkSince = if newPlayerMode == Ground then (playerWalkSince p) else Nothing
           }
+  return $ [ObjectPlayer np] ++ sensorLines
 
-processAirPlayerObject :: FrameState -> [GameObject] -> [IncomingAction] -> Player -> [GameObject]
-processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
-  where sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-        t = fsTimeDelta fs
-        sensors = applySensors os (playerPosition p) 0.0
+processAirPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM [GameObject]
+processAirPlayerObject gs ias p = do
+  t <- gdTimeDelta <$> get
+  currentTicks <- gdCurrentTicks <$> get
+  let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
+        sensors = applySensors (gsObjects gs) (playerPosition p) 0.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
         cCollision = sensCLCollision sensors <|> sensCRCollision sensors
         movingDownwards = (pY . playerVelocity) p >= 0.0
@@ -198,5 +204,6 @@ processAirPlayerObject fs os ias p = [ObjectPlayer np] ++ sensorLines
           playerPosition = Point2 newPlayerPositionX newPlayerPositionY,
           playerMode = newPlayerMode,
           playerVelocity = Point2 newPlayerVelocityX newPlayerVelocityY,
-          playerWalkSince = if newPlayerMode == Ground then Just (fsCurrentTicks fs) else Nothing
+          playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
           }
+  return $ [ObjectPlayer np] ++ sensorLines

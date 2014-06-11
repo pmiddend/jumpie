@@ -1,10 +1,8 @@
 module Jumpie.GameState(
-  GameState(GameState),
-  gsObjects,
-  gsGameover
+  GameState(..)
   ) where
 
-import Jumpie.GameObject(GameObject)
-import Data.Bool(Bool)
+import           Data.Bool         (Bool)
+import           Jumpie.GameObject (GameObject)
 
-data GameState = GameState { gsObjects :: [GameObject], gsGameover :: Bool }
+data GameState = GameState { gsObjects :: [GameObject], gsGameOver :: Bool }

@@ -11,10 +11,11 @@ module Jumpie.SDLHelper(
   withWindow,
   withRenderer,
   renderFinish,
-  processKeydowns
+  processKeydowns,
+  renderClear
   ) where
 
-import           Control.Monad         (return)
+import           Control.Monad         (return, (>>))
 import           Data.Bool             (Bool (..))
 import           Data.Function         (($), (.))
 import           Data.Int              (Int)
@@ -28,7 +29,7 @@ import           Graphics.UI.SDL.Enum  (eventActionGetEvent,
                                         windowFlagResizable)
 import           Graphics.UI.SDL.Event (peepEvents, pumpEvents)
 import qualified Graphics.UI.SDL.Types as SDLT
-import           Graphics.UI.SDL.Video (renderCopy)
+import qualified Graphics.UI.SDL.Video as SDLV
 --import           Jumpie.Bresenham             (bresenham)
 --import           Jumpie.Debug                 (traceShowId)
 --import           Jumpie.Geometry.Intersection (lineSegmentInsideRect)
@@ -45,9 +46,6 @@ import           Foreign.C.String      (withCStringLen)
 import           Graphics.UI.SDL.Enum  (windowPosUndefined, windowPosUndefined)
 import           Graphics.UI.SDL.Types (Renderer, Window)
 import           Graphics.UI.SDL.Types (Event (KeyboardEvent))
-import           Graphics.UI.SDL.Video (createRenderer, createWindow,
-                                        destroyRenderer, destroyWindow,
-                                        renderPresent, renderSetLogicalSize)
 import           Jumpie.Types          (Keydowns, PointInt)
 import           Prelude               (Num, RealFrac, error, floor, fromEnum,
                                         fromIntegral, undefined, (*), (+), (-))
@@ -65,6 +63,8 @@ processKeydowns k es = (k \\ keyUps) `union` keyDowns
           KeyboardEvent _ _ _ _ _ (SDLT.Keysym l _ _) -> l
           _ -> undefined
 
+renderClear :: Renderer -> IO ()
+renderClear renderer = SDLV.renderClear renderer >> return ()
 
 screenAbsoluteWidth,screenAbsoluteHeight :: Int
 screenAbsoluteWidth = 0
@@ -78,20 +78,20 @@ errorIfNonZero action s = do
   if result == 0 then return () else error $ s ++ " returned non-zero"
 
 renderFinish :: Renderer -> IO ()
-renderFinish renderer = renderPresent renderer
+renderFinish renderer = SDLV.renderPresent renderer
 
 withWindow :: String -> (Window -> IO a) -> IO a
 withWindow title callback = withCStringLen title $ \windowTitle ->
-  let acquireResource = createWindow (fst windowTitle) windowPosUndefined windowPosUndefined (fromIntegral screenAbsoluteWidth) (fromIntegral screenAbsoluteHeight) (fromIntegral windowFlags)
-      releaseResource = destroyWindow
+  let acquireResource = SDLV.createWindow (fst windowTitle) windowPosUndefined windowPosUndefined (fromIntegral screenAbsoluteWidth) (fromIntegral screenAbsoluteHeight) (fromIntegral windowFlags)
+      releaseResource = SDLV.destroyWindow
   in bracket acquireResource releaseResource callback
 
 withRenderer :: Window -> Int -> Int -> (Renderer -> IO a) -> IO a
 withRenderer window screenWidth screenHeight callback =
-  let acquireResource = createRenderer window (-1) 0
-      releaseResource = destroyRenderer
+  let acquireResource = SDLV.createRenderer window (-1) 0
+      releaseResource = SDLV.destroyRenderer
   in bracket acquireResource releaseResource $ \renderer -> do
-    errorIfNonZero (renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)) "renderSetLogicalSize"
+    errorIfNonZero (SDLV.renderSetLogicalSize renderer (fromIntegral screenWidth) (fromIntegral screenHeight)) "renderSetLogicalSize"
     callback renderer
 {-
 createPixel :: Surface -> (Word8,Word8,Word8) -> IO Pixel
@@ -124,7 +124,7 @@ fillSurface screen color = do
 -}
 renderSprite :: SDLT.Renderer -> SDLT.Texture -> SDLT.Rect -> SDLT.Rect -> IO ()
 renderSprite r t srcrect dstrect = with srcrect $ \srcrectptr -> with dstrect $ \dstrectptr ->
-  errorIfNonZero (renderCopy r t srcrectptr dstrectptr) "renderCopy"
+  errorIfNonZero (SDLV.renderCopy r t srcrectptr dstrectptr) "renderCopy"
 
 blitAtPosition :: SurfaceData -> PointInt -> SDLT.Renderer -> IO ()
 blitAtPosition (srcSurface,srcRect) pos renderer = do
