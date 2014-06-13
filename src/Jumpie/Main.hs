@@ -15,6 +15,9 @@ import           Graphics.UI.SDL.Enum       (Scancode, scancodeEscape,
 import           Graphics.UI.SDL.Image      (InitFlag (..), withImgInit)
 import           Graphics.UI.SDL.Types      (Event (QuitEvent, KeyboardEvent),
                                              Keysym (..))
+import           Jumpie.Commandize          (RenderCommand (RenderSprite),
+                                             RenderPositionMode (..),
+                                             commandizeGameState, optimizePlats)
 import           Jumpie.Game                (processGameObjects, testGameOver)
 import           Jumpie.GameConfig          (screenHeight, screenWidth)
 import           Jumpie.GameData            (GameData (GameData), GameDataM,
@@ -25,10 +28,7 @@ import           Jumpie.GameState           (GameState (GameState), gsGameOver,
                                              gsObjects)
 import           Jumpie.Geometry.Point      (Point2 (Point2))
 import           Jumpie.ImageData           (readAllDescFiles)
-import           Jumpie.Render              (RenderCommand (RenderSprite),
-                                             RenderPositionMode (..),
-                                             commandizeGameState, optimizePlats,
-                                             render, renderAll, renderFinish)
+import           Jumpie.Render              (render, renderAll, renderFinish)
 import           Jumpie.SDLHelper           (pollEvents, withRenderer,
                                              withWindow)
 import           Jumpie.Time                (TimeDelta (TimeDelta), getTicks)
