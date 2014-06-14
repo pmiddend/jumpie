@@ -13,7 +13,7 @@ import           Data.Map.Strict            ((!))
 import           Data.Tuple                 (snd)
 import           Data.Word                  (Word8)
 --import           Debug.Trace                 (trace)
-import           Control.Monad.State.Strict (get)
+import           Control.Monad.State.Strict (gets)
 import qualified Graphics.UI.SDL.Video      as SDLV
 import           Jumpie.Commandize          (RenderCommand (..),
                                              RenderPositionMode (..))
@@ -31,25 +31,25 @@ import           Prelude                    (Double, Fractional, Integral, abs,
 
 setRenderDrawColor :: Word8 -> Word8 -> Word8 -> Word8 -> GameDataM ()
 setRenderDrawColor r g b a = do
-  renderer <- gdRenderer <$> get
+  renderer <- gets gdRenderer
   liftIO $ SDLV.setRenderDrawColor renderer r g b a
   return ()
 
 renderClear :: GameDataM ()
 renderClear = do
-  renderer <- gdRenderer <$> get
+  renderer <- gets gdRenderer
   liftIO $ SDLV.renderClear renderer
   return ()
 
 renderFinish :: GameDataM ()
 renderFinish = do
-  renderer <- gdRenderer <$> get
+  renderer <- gets gdRenderer
   liftIO $ SDLH.renderFinish renderer
 
 blitAt :: ImageId -> PointInt -> RenderPositionMode -> GameDataM ()
 blitAt image pos mode = do
-  renderer <- gdRenderer <$> get
-  surfaces <- gdSurfaces <$> get
+  renderer <- gets gdRenderer
+  surfaces <- gets gdSurfaces
   let realPos = case mode of
           RenderPositionCenter -> pos - ((`div` 2) <$> (dimensions $ snd $ imageData))
           RenderPositionTopLeft -> pos

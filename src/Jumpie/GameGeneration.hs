@@ -14,7 +14,7 @@ import           Jumpie.GameObject      (Box (Box), BoxType (..),
                                          playerVelocity, playerWalkSince)
 import           Jumpie.Geometry.Point  (Point2 (Point2))
 import           Jumpie.Geometry.Rect   (Rect (Rect), rectTopLeft)
-import           Jumpie.Random          (randomElem)
+import           Jumpie.Random          (randomElemM)
 import           Jumpie.Types           (PointInt, PointReal, RectInt)
 --import Jumpie.Debug(traceShowId)
 import           Control.Applicative    ((<$>))
@@ -27,7 +27,8 @@ import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
                                          pTiles, randomPlatforms,
                                          validPlatforms)
 import           Prelude                (div, fromIntegral, (*), (+), (-), (/))
-import           System.Random          (RandomGen)
+import Control.Monad.Random(MonadRandom)
+import Control.Monad(return)
 
   {-
 initialPlayer :: Player
@@ -55,8 +56,8 @@ platsToPoints ps = concatMap pTiles ps
 tilesRect :: RectInt
 tilesRect = (Rect (Point2 1 1) (Point2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1)))
 
-generateRandomPlats :: RandomGen g => g -> [Platform]
-generateRandomPlats g = randomPlatforms g tilesRect gcPlatMaxLength
+generateRandomPlats :: MonadRandom m => m [Platform]
+generateRandomPlats = randomPlatforms tilesRect gcPlatMaxLength
 
 platToBoxes :: [PointInt] -> Platform -> [Box]
 platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
@@ -74,18 +75,22 @@ platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
           where hasLeft = (Point2 (x-1) y) `elem` plats
                 hasRight = (Point2 (x+1) y) `elem` plats
 
-randomAbovePlatPosition :: RandomGen r => r -> [GameObject] -> PointReal
-randomAbovePlatPosition r xs = rectTopLeft . boxPosition $ randomElem r boxes
-  where boxes = concatMap (maybeToList . maybeBox) xs
+randomAbovePlatPosition :: MonadRandom m => [GameObject] -> m PointReal
+randomAbovePlatPosition xs = do
+  randomBox <- randomElemM $ concatMap (maybeToList . maybeBox) xs
+  return . rectTopLeft . boxPosition $ randomBox
 
-generateGame :: RandomGen r => r -> [GameObject]
-generateGame r = (ObjectPlayer $ player) : boxes
-  where plats = take gcPlatCount $ validPlatforms easyParabolas (generateRandomPlats r)
-        platformPoints = platsToPoints plats
-        boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
-        player = Player {
-          playerPosition = (randomAbovePlatPosition r boxes) - (Point2 0 (fromIntegral gcTileSize)),
-          playerMode = Air,
-          playerVelocity = Point2 0.0 0.0,
-          playerWalkSince = Nothing
-          }
+generateGame :: MonadRandom m => m [GameObject]
+generateGame = do
+  rawPlats <- generateRandomPlats
+  let plats = take gcPlatCount $ validPlatforms easyParabolas rawPlats
+      platformPoints = platsToPoints plats
+      boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
+  rawPlayerPos <- randomAbovePlatPosition boxes
+  let player = Player {
+        playerPosition = rawPlayerPos - (Point2 0 (fromIntegral gcTileSize)),
+        playerMode = Air,
+        playerVelocity = Point2 0.0 0.0,
+        playerWalkSince = Nothing
+      }
+  return $ (ObjectPlayer $ player) : boxes

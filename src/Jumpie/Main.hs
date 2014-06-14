@@ -2,6 +2,7 @@ module Main where
 
 
 import           Control.Monad              (return, unless, (=<<))
+import           Control.Monad.Random       (evalRand)
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.State.Strict (get)
 import           Data.Bool                  (Bool (..), (||))
@@ -87,6 +88,6 @@ main =
         ticks <- getTicks
         g <- getStdGen
         let gameData = GameData images anims renderer ticks (TimeDelta 0) []
-        (lastGameState,lastGameData) <- runGame g (stageMainLoop (GameState (generateGame g) False)) gameData
-        _ <- runGame (gameoverMainLoop lastGameState) lastGameData
+        (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop (GameState (evalRand generateGame g) False)
+        _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
         return ()

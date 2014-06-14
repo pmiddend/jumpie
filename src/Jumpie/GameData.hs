@@ -18,7 +18,7 @@ import           Jumpie.ImageData           (AnimMap, SurfaceMap)
 import           Jumpie.SDLHelper           (processKeydowns)
 import           Jumpie.Time                (GameTicks, TimeDelta (TimeDelta),
                                              getTicks, tickDelta)
-import           Jumpie.Types               (Keydowns, PointInt)
+import           Jumpie.Types               (Keydowns)
 import           Prelude                    (div, (*), (-))
 import           System.IO                  (IO)
 import           System.Random              (StdGen)
@@ -52,5 +52,5 @@ updateKeydowns events = do
   s <- get
   put s { gdKeydowns = processKeydowns oldKeydowns events }
 
-runGame :: RandomGen r => r -> GameData -> GameDataM a -> IO (a,GameData)
+runGame :: StdGen -> GameData -> GameDataM a -> IO (a,GameData)
 runGame r gameData game = runStateT (evalRandT game r) gameData

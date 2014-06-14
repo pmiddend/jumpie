@@ -15,6 +15,7 @@ module Jumpie.LevelGeneration(
 
 import           Control.Applicative          (pure, (<$>), (<*>))
 import           Control.Category             ((>>>))
+import Control.Monad(return)
 import           Data.Bool                    (Bool, not, (&&), (||))
 import           Data.Function                (($), (.))
 import           Data.Functor                 (fmap)
@@ -39,8 +40,9 @@ import           Jumpie.Types                 (LineSegmentReal, PointInt,
                                                PointReal, Real, RectInt)
 import           Prelude                      (fromIntegral, otherwise, sqrt,
                                                (*), (+), (-), (/))
-import           System.Random                (Random, RandomGen, randomR)
 import           Text.Show                    (Show, show)
+import Control.Monad(forever)
+import Control.Monad.Random(MonadRandom,getRandomR)
 
 data Platform = Platform PointInt PointInt deriving(Show)
 
@@ -64,17 +66,15 @@ validPlatforms paras = inductiveFilter (\x xs -> not (intersects xs x) && not (u
           where r = pure (pReachable paras p) <*> ps
 
 randomPlatform :: MonadRandom m => RectInt -> Int -> m Platform
-randomPlatform (Rect (Point2 left top) (Point2 right bottom)) maxLength =
-  (left,right) <- 
-  case randomR (left,right) r0 of
-    (pleft,r1) -> case randomR (pleft,min right (pleft+maxLength)) r1 of
-      -- Fehler liegt hier, das muss nicht ptop sein und unten muss nicht pright hin
-      (pright,r2) -> case randomR (top,bottom) r2 of
-        (ptop,r3) -> (Platform (Point2 pleft ptop) (Point2 pright ptop),r3)
+randomPlatform (Rect (Point2 left top) (Point2 right bottom)) maxLength = do
+  pleft <- getRandomR (left,right)
+  pright <- getRandomR (pleft,min right (pleft+maxLength))
+  ptop <- getRandomR (top,bottom)
+  return $ Platform (Point2 pleft ptop) (Point2 pright ptop)
 
-randomPlatforms :: RandomGen r => r -> RectInt -> Int -> [Platform]
-randomPlatforms r0 rect maxLength = p1 : (randomPlatforms r1 rect maxLength)
-  where (p1,r1) = randomPlatform r0 rect maxLength
+-- Neu
+randomPlatforms :: MonadRandom m => RectInt -> Int -> m [Platform]
+randomPlatforms rect maxLength = forever (randomPlatform rect maxLength)
 
 -- Schneiden sich zwei Plattformen
 pIntersects :: Platform -> Platform -> Bool
