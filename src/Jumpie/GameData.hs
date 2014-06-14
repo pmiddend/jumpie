@@ -1,29 +1,19 @@
 module Jumpie.GameData(
-  GameData(GameData),
-  gdSurfaces,
-  gdAnims,
-  gdRenderer,
-  gdRandomGen,
-  gdCurrentTicks,
-  gdTimeDelta,
-  gdKeydowns,
+  GameData(..),
   updateKeydowns,
   updateTicks,
   GameDataM,
   runGame
   ) where
 
-import           Control.Applicative        ((<$>))
-
 import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.State.Strict (StateT, get, put, runStateT)
-
-
+import           Control.Monad.State.Strict (StateT, get, gets, put, runStateT)
 
 
 import           Graphics.UI.SDL.Types      (Event, Renderer)
 import           Jumpie.GameConfig          (gcTimeMultiplier)
 
+import           Control.Monad.Random       (RandT, evalRandT)
 import           Jumpie.ImageData           (AnimMap, SurfaceMap)
 import           Jumpie.SDLHelper           (processKeydowns)
 import           Jumpie.Time                (GameTicks, TimeDelta (TimeDelta),
@@ -37,17 +27,18 @@ data GameData = GameData {
                 gdSurfaces     :: SurfaceMap,
                 gdAnims        :: AnimMap,
                 gdRenderer     :: Renderer,
-                gdRandomGen    :: StdGen,
                 gdCurrentTicks :: !GameTicks,
                 gdTimeDelta    :: !TimeDelta,
                 gdKeydowns     :: !Keydowns
               }
 
-type GameDataM = StateT GameData IO
+type GameDataBaseM = StateT GameData IO
+
+type GameDataM = RandT StdGen GameDataBaseM
 
 updateTicks :: GameDataM ()
 updateTicks = do
-  oldTicks <- gdCurrentTicks <$> get
+  oldTicks <- gets gdCurrentTicks
   newTicks <- liftIO getTicks
   s <- get
   put s {
@@ -57,9 +48,9 @@ updateTicks = do
 
 updateKeydowns :: [Event] -> GameDataM ()
 updateKeydowns events = do
-  oldKeydowns <- gdKeydowns <$> get
+  oldKeydowns <- gets gdKeydowns
   s <- get
   put s { gdKeydowns = processKeydowns oldKeydowns events }
 
-runGame :: GameDataM a -> GameData -> IO (a,GameData)
-runGame = runStateT
+runGame :: RandomGen r => r -> GameData -> GameDataM a -> IO (a,GameData)
+runGame r gameData game = runStateT (evalRandT game r) gameData

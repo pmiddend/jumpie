@@ -84,9 +84,9 @@ main =
     withWindow "jumpie 0.1" $ \window -> do
       withRenderer window screenWidth screenHeight $ \renderer -> do
         (images,anims) <- readAllDescFiles renderer
-        g <- getStdGen
         ticks <- getTicks
-        let gameData = GameData images anims renderer g ticks (TimeDelta 0) []
-        (lastGameState,lastGameData) <- runGame (stageMainLoop (GameState (generateGame g) False)) gameData
+        g <- getStdGen
+        let gameData = GameData images anims renderer ticks (TimeDelta 0) []
+        (lastGameState,lastGameData) <- runGame g (stageMainLoop (GameState (generateGame g) False)) gameData
         _ <- runGame (gameoverMainLoop lastGameState) lastGameData
         return ()

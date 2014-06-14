@@ -13,28 +13,34 @@ module Jumpie.LevelGeneration(
   showPlatformsPpm,
   randomPlatforms) where
 
-import System.Random(Random,randomR,RandomGen)
-import Jumpie.Geometry.Point(Point2(Point2))
-import Jumpie.Tuple(both)
-import Jumpie.Geometry.Rect(Rect(Rect),dimensions)
-import Jumpie.Geometry.Intersection(parabolaPointIntersects)
-import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
-import Jumpie.Geometry.Parabola(Parabola(Parabola),paraInvert)
-import Jumpie.Types(RectInt,PointInt,LineSegmentReal,PointReal,Real)
-import Jumpie.GameConfig(gcGrv,gcTimeMultiplier,gcJmp,gcPlayerMaxSpeed,gcTileSize)
-import Data.Bool((||),Bool,(&&),not)
-import Control.Category((>>>))
-import Data.Function((.),($))
-import Data.Tuple(uncurry)
-import Prelude((*),sqrt,(-),(/),(+),fromIntegral,otherwise)
-import Data.List(or,(!!),(++),replicate,intersperse,unlines,concatMap,intersect,null,reverse)
-import Data.Int(Int)
-import Data.String(String)
-import Data.Ord(Ord,(<=),min)
-import Control.Applicative((<*>),pure,(<$>))
-import Data.Functor(fmap)
-import Text.Show(Show,show)
-import Jumpie.List(setPartList,replaceNth,orEmptyTrue,inductiveFilter)
+import           Control.Applicative          (pure, (<$>), (<*>))
+import           Control.Category             ((>>>))
+import           Data.Bool                    (Bool, not, (&&), (||))
+import           Data.Function                (($), (.))
+import           Data.Functor                 (fmap)
+import           Data.Int                     (Int)
+import           Data.List                    (concatMap, intersect,
+                                               intersperse, null, or, replicate,
+                                               reverse, unlines, (!!), (++))
+import           Data.Ord                     (Ord, min, (<=))
+import           Data.String                  (String)
+import           Data.Tuple                   (uncurry)
+import           Jumpie.GameConfig            (gcGrv, gcJmp, gcPlayerMaxSpeed,
+                                               gcTileSize, gcTimeMultiplier)
+import           Jumpie.Geometry.Intersection (parabolaPointIntersects)
+import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
+import           Jumpie.Geometry.Parabola     (Parabola (Parabola), paraInvert)
+import           Jumpie.Geometry.Point        (Point2 (Point2))
+import           Jumpie.Geometry.Rect         (Rect (Rect), dimensions)
+import           Jumpie.List                  (inductiveFilter, orEmptyTrue,
+                                               replaceNth, setPartList)
+import           Jumpie.Tuple                 (both)
+import           Jumpie.Types                 (LineSegmentReal, PointInt,
+                                               PointReal, Real, RectInt)
+import           Prelude                      (fromIntegral, otherwise, sqrt,
+                                               (*), (+), (-), (/))
+import           System.Random                (Random, RandomGen, randomR)
+import           Text.Show                    (Show, show)
 
 data Platform = Platform PointInt PointInt deriving(Show)
 
@@ -57,8 +63,9 @@ validPlatforms paras = inductiveFilter (\x xs -> not (intersects xs x) && not (u
         unreachable ps p = not $ orEmptyTrue $ r
           where r = pure (pReachable paras p) <*> ps
 
-randomPlatform :: RandomGen r => r -> RectInt -> Int -> (Platform,r)
-randomPlatform r0 (Rect (Point2 left top) (Point2 right bottom)) maxLength =
+randomPlatform :: MonadRandom m => RectInt -> Int -> m Platform
+randomPlatform (Rect (Point2 left top) (Point2 right bottom)) maxLength =
+  (left,right) <- 
   case randomR (left,right) r0 of
     (pleft,r1) -> case randomR (pleft,min right (pleft+maxLength)) r1 of
       -- Fehler liegt hier, das muss nicht ptop sein und unten muss nicht pright hin
