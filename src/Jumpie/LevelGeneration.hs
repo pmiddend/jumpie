@@ -15,14 +15,14 @@ module Jumpie.LevelGeneration(
 
 import           Control.Applicative          (pure, (<$>), (<*>))
 import           Control.Category             ((>>>))
-import Control.Monad(return)
+import Control.Monad(return,sequence)
 import           Data.Bool                    (Bool, not, (&&), (||))
 import           Data.Function                (($), (.))
 import           Data.Functor                 (fmap)
 import           Data.Int                     (Int)
 import           Data.List                    (concatMap, intersect,
                                                intersperse, null, or, replicate,
-                                               reverse, unlines, (!!), (++))
+                                               reverse, unlines, (!!), (++),repeat)
 import           Data.Ord                     (Ord, min, (<=))
 import           Data.String                  (String)
 import           Data.Tuple                   (uncurry)
@@ -41,7 +41,6 @@ import           Jumpie.Types                 (LineSegmentReal, PointInt,
 import           Prelude                      (fromIntegral, otherwise, sqrt,
                                                (*), (+), (-), (/))
 import           Text.Show                    (Show, show)
-import Control.Monad(forever)
 import Control.Monad.Random(MonadRandom,getRandomR)
 
 data Platform = Platform PointInt PointInt deriving(Show)
@@ -74,7 +73,7 @@ randomPlatform (Rect (Point2 left top) (Point2 right bottom)) maxLength = do
 
 -- Neu
 randomPlatforms :: MonadRandom m => RectInt -> Int -> m [Platform]
-randomPlatforms rect maxLength = forever (randomPlatform rect maxLength)
+randomPlatforms rect maxLength = sequence $ repeat (randomPlatform rect maxLength)
 
 -- Schneiden sich zwei Plattformen
 pIntersects :: Platform -> Platform -> Bool
