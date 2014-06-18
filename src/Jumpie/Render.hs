@@ -32,13 +32,13 @@ import           Prelude                    (Double, Fractional, Integral, abs,
 setRenderDrawColor :: Word8 -> Word8 -> Word8 -> Word8 -> GameDataM ()
 setRenderDrawColor r g b a = do
   renderer <- gets gdRenderer
-  liftIO $ SDLV.setRenderDrawColor renderer r g b a
+  _ <- liftIO $ SDLV.setRenderDrawColor renderer r g b a
   return ()
 
 renderClear :: GameDataM ()
 renderClear = do
   renderer <- gets gdRenderer
-  liftIO $ SDLV.renderClear renderer
+  _ <- liftIO $ SDLV.renderClear renderer
   return ()
 
 renderFinish :: GameDataM ()

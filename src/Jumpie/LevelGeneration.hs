@@ -36,8 +36,8 @@ import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
 import           Jumpie.Geometry.Parabola     (Parabola (Parabola), paraInvert)
 import           Jumpie.Geometry.Point        (Point2 (Point2))
 import           Jumpie.Geometry.Rect         (Rect (Rect), dimensions)
-import           Jumpie.List                  (inductiveFilter, orEmptyTrue,
-                                               replaceNth, setPartList)
+import           Jumpie.List                  (orEmptyTrue, replaceNth,
+                                               setPartList)
 import           Jumpie.Tuple                 (both)
 import           Jumpie.Types                 (LineSegmentReal, PointInt,
                                                PointReal, Real, RectInt)

@@ -23,7 +23,7 @@ import           Control.Monad.Random   (MonadRandom)
 import           Data.Bool              ((&&))
 import           Data.Function          (($), (.))
 import           Data.Functor           (fmap)
-import           Data.List              (concatMap, elem, map, take)
+import           Data.List              (concatMap, elem, map)
 import           Data.Maybe             (Maybe (Nothing), maybeToList)
 import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
                                          pTiles, randomPlatform, validPlatforms)
