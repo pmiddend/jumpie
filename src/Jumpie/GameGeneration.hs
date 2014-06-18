@@ -2,19 +2,22 @@
 
 module Jumpie.GameGeneration(
   generateGame,
-  randomAbovePlatPosition
+  randomAbovePlatPosition,
+  randomStar
   ) where
 
 import           Jumpie.GameConfig      (gcPlatCount, gcPlatMaxLength,
                                          gcTileSize, screenHeight, screenWidth)
 import           Jumpie.GameObject      (Box (Box), BoxType (..),
                                          GameObject (..), Player (Player),
-                                         PlayerMode (..), boxPosition, maybeBox,
-                                         playerMode, playerPosition,
-                                         playerVelocity, playerWalkSince)
+                                         PlayerMode (..), Star (..),
+                                         boxPosition, maybeBox, playerMode,
+                                         playerPosition, playerVelocity,
+                                         playerWalkSince)
 import           Jumpie.Geometry.Point  (Point2 (Point2))
 import           Jumpie.Geometry.Rect   (Rect (Rect), rectTopLeft)
 import           Jumpie.Random          (randomElemM)
+import           Jumpie.Time            (GameTicks)
 import           Jumpie.Types           (PointInt, PointReal, RectInt)
 --import Jumpie.Debug(traceShowId)
 import           Control.Applicative    ((<$>))
@@ -75,6 +78,11 @@ randomAbovePlatPosition :: MonadRandom m => [GameObject] -> m PointReal
 randomAbovePlatPosition xs = do
   randomBox <- randomElemM $ concatMap (maybeToList . maybeBox) xs
   return . rectTopLeft . boxPosition $ randomBox
+
+randomStar :: MonadRandom m => GameTicks -> [GameObject] -> m Star
+randomStar ticks xs = do
+  p <- randomAbovePlatPosition xs
+  return $ Star p ticks
 
 generateGame :: MonadRandom m => m [GameObject]
 generateGame = do

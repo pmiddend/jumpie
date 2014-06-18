@@ -1,14 +1,15 @@
 module Main where
 
 
-import           Control.Monad              (return, unless, (=<<))
-import           Control.Monad.Random       (evalRand)
+import           Control.Monad              (replicateM, return, unless, (=<<))
 import           Control.Monad.IO.Class     (liftIO)
+import           Control.Monad.Random       (evalRand)
 import           Control.Monad.State.Strict (get)
 import           Data.Bool                  (Bool (..), (||))
 import           Data.Eq                    ((==))
 import           Data.Function              (($), (.))
-import           Data.List                  (any, concatMap, lookup)
+import           Data.List                  (any, concatMap, length, lookup,
+                                             map)
 import           Data.Maybe                 (fromMaybe)
 import           Graphics.UI.SDL.Enum       (Scancode, scancodeEscape,
                                              scancodeLeft, scancodeRight,
@@ -24,7 +25,8 @@ import           Jumpie.GameConfig          (screenHeight, screenWidth)
 import           Jumpie.GameData            (GameData (GameData), GameDataM,
                                              gdKeydowns, runGame,
                                              updateKeydowns, updateTicks)
-import           Jumpie.GameGeneration      (generateGame)
+import           Jumpie.GameGeneration      (generateGame, randomStar)
+import           Jumpie.GameObject          (isStar)
 import           Jumpie.GameState           (GameState (GameState), gsGameOver,
                                              gsObjects)
 import           Jumpie.Geometry.Point      (Point2 (Point2))
@@ -61,6 +63,7 @@ stageMainLoop gameState = do
       gameData <- get
       let incomingActions = concatMap kdToAction (gdKeydowns gameData)
       newObjects <- processGameObjects gameState incomingActions
+      --remainingStars <- replicateM (length $ map isStar newObjects) randomStar
       let newState = gameState { gsGameOver = testGameOver gameState, gsObjects = newObjects }
       renderAll =<< (return . optimizePlats) =<< commandizeGameState gameState
       renderFinish
