@@ -18,17 +18,16 @@ import           Jumpie.Random          (randomElemM)
 import           Jumpie.Types           (PointInt, PointReal, RectInt)
 --import Jumpie.Debug(traceShowId)
 import           Control.Applicative    ((<$>))
+import           Control.Monad          (return)
+import           Control.Monad.Random   (MonadRandom)
 import           Data.Bool              ((&&))
 import           Data.Function          (($), (.))
 import           Data.Functor           (fmap)
 import           Data.List              (concatMap, elem, map, take)
 import           Data.Maybe             (Maybe (Nothing), maybeToList)
 import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
-                                         pTiles, randomPlatforms,
-                                         validPlatforms)
+                                         pTiles, randomPlatform, validPlatforms)
 import           Prelude                (div, fromIntegral, (*), (+), (-), (/))
-import Control.Monad.Random(MonadRandom)
-import Control.Monad(return)
 
   {-
 initialPlayer :: Player
@@ -56,9 +55,6 @@ platsToPoints ps = concatMap pTiles ps
 tilesRect :: RectInt
 tilesRect = (Rect (Point2 1 1) (Point2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1)))
 
-generateRandomPlats :: MonadRandom m => m [Platform]
-generateRandomPlats = randomPlatforms tilesRect gcPlatMaxLength
-
 platToBoxes :: [PointInt] -> Platform -> [Box]
 platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
   where toBox x = Box (bpos x) (btype x)
@@ -82,9 +78,8 @@ randomAbovePlatPosition xs = do
 
 generateGame :: MonadRandom m => m [GameObject]
 generateGame = do
-  rawPlats <- generateRandomPlats
-  let plats = take gcPlatCount $ validPlatforms easyParabolas rawPlats
-      platformPoints = platsToPoints plats
+  plats <- validPlatforms gcPlatCount easyParabolas (randomPlatform tilesRect gcPlatMaxLength)
+  let platformPoints = platsToPoints plats
       boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
   rawPlayerPos <- randomAbovePlatPosition boxes
   let player = Player {

@@ -15,14 +15,17 @@ module Jumpie.LevelGeneration(
 
 import           Control.Applicative          (pure, (<$>), (<*>))
 import           Control.Category             ((>>>))
-import Control.Monad(return)
+import           Control.Monad                (return)
+import           Control.Monad.Random         (MonadRandom, getRandomR)
 import           Data.Bool                    (Bool, not, (&&), (||))
+import           Data.Eq                      ((==))
 import           Data.Function                (($), (.))
 import           Data.Functor                 (fmap)
 import           Data.Int                     (Int)
 import           Data.List                    (concatMap, intersect,
-                                               intersperse, null, or, replicate,
-                                               reverse, unlines, (!!), (++))
+                                               intersperse, length, null, or,
+                                               replicate, reverse, unlines,
+                                               (!!), (++))
 import           Data.Ord                     (Ord, min, (<=))
 import           Data.String                  (String)
 import           Data.Tuple                   (uncurry)
@@ -41,8 +44,6 @@ import           Jumpie.Types                 (LineSegmentReal, PointInt,
 import           Prelude                      (fromIntegral, otherwise, sqrt,
                                                (*), (+), (-), (/))
 import           Text.Show                    (Show, show)
-import Control.Monad(forever)
-import Control.Monad.Random(MonadRandom,getRandomR)
 
 data Platform = Platform PointInt PointInt deriving(Show)
 
@@ -56,8 +57,16 @@ showPlatforms r ps' = showPlatforms' (replicate h (replicate w '0')) ps'
 showPlatformsPpm :: RectInt -> [Platform] -> String
 showPlatformsPpm r@(Rect _ (Point2 w h)) ps = unlines $ ["P1",show w ++ " " ++ show h] ++ (reverse $ (intersperse ' ') <$> (showPlatforms r ps))
 
-validPlatforms :: [Parabola Real] -> [Platform] -> [Platform]
-validPlatforms paras = inductiveFilter (\x xs -> not (intersects xs x) && not (unreachable xs x))
+validPlatforms :: MonadRandom m => Int -> [Parabola Real] -> m Platform -> m [Platform]
+validPlatforms max paras randPlat = validPlatforms' max paras randPlat []
+
+validPlatforms' :: MonadRandom m => Int -> [Parabola Real] -> m Platform -> [Platform] -> m [Platform]
+validPlatforms' max paras randPlat ns | length ns == max = return ns
+                                      | otherwise = do
+                                        x <- randPlat
+                                        if not (intersects ns x) && not (unreachable ns x)
+                                          then validPlatforms' max paras randPlat (x:ns)
+                                          else validPlatforms' max paras randPlat ns
   where intersects :: [Platform] -> Platform -> Bool
         intersects ps p = or r
           where r = pure (pIntersects p) <*> ps
@@ -74,7 +83,10 @@ randomPlatform (Rect (Point2 left top) (Point2 right bottom)) maxLength = do
 
 -- Neu
 randomPlatforms :: MonadRandom m => RectInt -> Int -> m [Platform]
-randomPlatforms rect maxLength = forever (randomPlatform rect maxLength)
+randomPlatforms rect maxLength = do
+  p <- randomPlatform rect maxLength
+  ps <- randomPlatforms rect maxLength
+  return $ p : ps
 
 -- Schneiden sich zwei Plattformen
 pIntersects :: Platform -> Platform -> Bool
