@@ -1,18 +1,23 @@
 module Jumpie.List(
-  setPartList,
-  replaceNth,
-  orEmptyTrue,
-  inductiveFilter,
-  withSuccessor,
-  withPredecessor
+    setPartList
+  , replaceNth
+  , orEmptyTrue
+  , inductiveFilter
+  , withSuccessor
+  , withPredecessor
+  , countBy
   ) where
 
 import Data.Int(Int)
-import Data.List(take,replicate,drop,(++),or)
+import Data.List(take,replicate,drop,(++),or,elemIndices,map,length)
 import Prelude((+),(-),otherwise)
 import Data.Ord((<))
 import Data.Bool(Bool(True))
 import Data.Maybe(Maybe(..))
+import Data.Function(($))
+
+countBy :: (a -> Bool) -> [a] -> Int
+countBy p xs = length $ elemIndices True $ (map p xs)
 
 withSuccessor :: [a] -> [(a,Maybe a)]
 withSuccessor [] = []

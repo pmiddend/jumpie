@@ -4,5 +4,11 @@ module Jumpie.GameState(
 
 import           Data.Bool         (Bool)
 import           Jumpie.GameObject (GameObject)
+import Data.Int(Int)
 
-data GameState = GameState { gsObjects :: [GameObject], gsGameOver :: Bool }
+data GameState = GameState {
+    gsObjects :: [GameObject]
+  , gsGameOver :: Bool
+  , gsStarsCollected :: Int
+  , gsStarsTotal :: Int
+  }

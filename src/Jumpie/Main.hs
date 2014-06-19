@@ -1,6 +1,5 @@
 module Main where
 
-
 import           Control.Monad              (replicateM, return, unless, (=<<))
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Random       (evalRand)
@@ -22,12 +21,12 @@ import           Jumpie.Commandize          (RenderCommand (RenderSprite),
                                              commandizeGameState, optimizePlats)
 import           Jumpie.Game                (processGameObjects, testGameOver)
 import           Jumpie.GameConfig          (screenHeight, screenWidth,gcStars)
-import           Jumpie.GameData            (GameData (GameData), GameDataM,
+import           Jumpie.GameData            (GameData (..), GameDataM,
                                              gdKeydowns, runGame,
                                              updateKeydowns, updateTicks,gdCurrentTicks)
 import           Jumpie.GameGeneration      (generateGame, randomStar)
 import           Jumpie.GameObject          (isStar,GameObject(..))
-import           Jumpie.GameState           (GameState (GameState), gsGameOver,
+import           Jumpie.GameState           (GameState (..), gsGameOver,
                                              gsObjects)
 import           Jumpie.Geometry.Point      (Point2 (Point2))
 import           Jumpie.ImageData           (readAllDescFiles)
@@ -35,7 +34,8 @@ import           Jumpie.Render              (render, renderAll, renderFinish)
 import           Jumpie.SDLHelper           (pollEvents, withRenderer,
                                              withWindow)
 import           Jumpie.Time                (TimeDelta (TimeDelta), getTicks)
-import           Jumpie.Types               (IncomingAction (..))
+import           Jumpie.Types               (IncomingAction (..),isStarCollected)
+import Jumpie.List(countBy)
 import           Prelude                    (Double, Fractional, Integral, abs,
                                              div, error, floor, fromIntegral,
                                              mod, undefined, (*), (+), (-), (/))
@@ -57,19 +57,20 @@ stageMainLoop gameState = do
   events <- liftIO pollEvents
   updateTicks
   updateKeydowns events
-  if (outerGameOver events || gsGameOver gameState)
+  if (outerGameOver events || gsGameOver gameState || gsStarsCollected gameState == gsStarsTotal gameState)
     then return gameState
     else do
       gameData <- get
       let incomingActions = concatMap kdToAction (gdKeydowns gameData)
       (newObjects,actions) <- processGameObjects gameState incomingActions
-      let currentStars = length . filter (== True) . map isStar $ newObjects
+      let currentStars = countBy isStar newObjects
       remainingStars <- replicateM
                         (gcStars - currentStars)
                         (randomStar (gdCurrentTicks gameData) newObjects)
       let newState = gameState {
-            gsGameOver = testGameOver gameState,
-            gsObjects = newObjects ++ (map ObjectStar remainingStars)
+              gsGameOver = testGameOver gameState
+            , gsObjects = newObjects ++ (map ObjectStar remainingStars)
+            , gsStarsCollected = gsStarsCollected gameState + (countBy isStarCollected actions)
             }
       renderAll =<< (return . optimizePlats) =<< commandizeGameState gameState
       renderFinish
@@ -96,7 +97,20 @@ main =
         (images,anims) <- readAllDescFiles renderer
         ticks <- getTicks
         g <- getStdGen
-        let gameData = GameData images anims renderer ticks (TimeDelta 0) []
-        (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop (GameState (evalRand generateGame g) False)
+        let gameData = GameData {
+            gdSurfaces = images
+          , gdAnims = anims
+          , gdRenderer = renderer
+          , gdCurrentTicks = ticks
+          , gdTimeDelta = TimeDelta 0
+          , gdKeydowns = []
+          }
+        let initialGameState = GameState {
+            gsObjects = (evalRand generateGame g)
+          , gsGameOver = False
+          , gsStarsCollected = 0
+          , gsStarsTotal = 10
+          }
+        (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop initialGameState
         _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
         return ()

@@ -1,9 +1,9 @@
 module Jumpie.GameData(
-  GameData(..),
-  updateKeydowns,
-  updateTicks,
-  GameDataM,
-  runGame
+    GameData(..)
+  , updateKeydowns
+  , updateTicks
+  , GameDataM
+  , runGame
   ) where
 
 import           Control.Monad.IO.Class     (liftIO)
@@ -24,12 +24,12 @@ import           System.IO                  (IO)
 import           System.Random              (StdGen)
 
 data GameData = GameData {
-                gdSurfaces     :: SurfaceMap,
-                gdAnims        :: AnimMap,
-                gdRenderer     :: Renderer,
-                gdCurrentTicks :: !GameTicks,
-                gdTimeDelta    :: !TimeDelta,
-                gdKeydowns     :: !Keydowns
+                  gdSurfaces     :: SurfaceMap
+                , gdAnims        :: AnimMap
+                , gdRenderer     :: Renderer
+                , gdCurrentTicks :: !GameTicks
+                , gdTimeDelta    :: !TimeDelta
+                , gdKeydowns     :: !Keydowns
               }
 
 type GameDataBaseM = StateT GameData IO

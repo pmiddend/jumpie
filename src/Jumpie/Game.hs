@@ -1,6 +1,6 @@
 module Jumpie.Game(processGameObjects,testGameOver) where
 
-import           Control.Applicative          ((<$>), (<|>))
+import           Control.Applicative          ((<|>))
 import           Control.Monad                (mapM,return)
 import           Control.Monad.State.Strict   (gets)
 import           Data.Bool                    (Bool (False, True), not, (&&),
