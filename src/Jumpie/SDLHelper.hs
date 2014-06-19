@@ -5,14 +5,15 @@ module Jumpie.SDLHelper(
   surfaceBresenham,
   fillSurface,
 -}
-  blitAtPosition,
-  pollEvents,
-  fromSDLRect,
-  withWindow,
-  withRenderer,
-  renderFinish,
-  processKeydowns,
-  renderClear
+    blitSameSize
+  , blitRescale
+  , pollEvents
+  , fromSDLRect
+  , withWindow
+  , withRenderer
+  , renderFinish
+  , processKeydowns
+  , renderClear
   ) where
 
 import           Control.Monad         (return, (>>))
@@ -46,7 +47,7 @@ import           Foreign.C.String      (withCStringLen)
 import           Graphics.UI.SDL.Enum  (windowPosUndefined, windowPosUndefined)
 import           Graphics.UI.SDL.Types (Renderer, Window)
 import           Graphics.UI.SDL.Types (Event (KeyboardEvent))
-import           Jumpie.Types          (Keydowns, PointInt)
+import           Jumpie.Types          (Keydowns, PointInt, RectInt)
 import           Prelude               (Num, RealFrac, error, floor, fromEnum,
                                         fromIntegral, undefined, (*), (+), (-))
 import           System.IO             (IO)
@@ -126,10 +127,13 @@ renderSprite :: SDLT.Renderer -> SDLT.Texture -> SDLT.Rect -> SDLT.Rect -> IO ()
 renderSprite r t srcrect dstrect = with srcrect $ \srcrectptr -> with dstrect $ \dstrectptr ->
   errorIfNonZero (SDLV.renderCopy r t srcrectptr dstrectptr) "renderCopy"
 
-blitAtPosition :: SurfaceData -> PointInt -> SDLT.Renderer -> IO ()
-blitAtPosition (srcSurface,srcRect) pos renderer = do
-  let destRect = Rect pos (pos + (dimensions srcRect))
+blitRescale :: SurfaceData -> RectInt -> SDLT.Renderer -> IO ()
+blitRescale (srcSurface,srcRect) destRect renderer = do
   renderSprite renderer srcSurface (toSDLRect srcRect) (toSDLRect destRect)
+
+blitSameSize :: SurfaceData -> PointInt -> SDLT.Renderer -> IO ()
+blitSameSize sd@(_,srcRect) pos renderer =
+  blitRescale sd (Rect pos (pos + (dimensions srcRect))) renderer
 
 eventArrayStaticSize :: Int
 eventArrayStaticSize = 128

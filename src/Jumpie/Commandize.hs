@@ -56,6 +56,7 @@ data RenderPositionMode = RenderPositionCenter | RenderPositionTopLeft deriving(
 
 data RenderCommand = FillScreen RGBColor |
                      RenderSprite String PointInt RenderPositionMode |
+                     RenderBackground String |
                      RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
 
 -- Mutumorphismus zwischen optimizePlats und compressPlatforms
@@ -77,7 +78,7 @@ compressPlatform _ = error "compressPlatform given something other than RenderSp
 commandizeGameState :: GameState -> GameDataM [RenderCommand]
 commandizeGameState gs = do
   commandizedObjects <- concatMapM commandizeObject (gsObjects gs)
-  return $ FillScreen backgroundColor : commandizedObjects
+  return $ RenderBackground "background" : commandizedObjects
 
 commandizeObject :: GameObject -> GameDataM [RenderCommand]
 commandizeObject ob = case ob of
