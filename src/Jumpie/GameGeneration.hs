@@ -77,12 +77,12 @@ platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
 randomAbovePlatPosition :: MonadRandom m => [GameObject] -> m PointReal
 randomAbovePlatPosition xs = do
   randomBox <- randomElemM $ concatMap (maybeToList . maybeBox) xs
-  return . rectTopLeft . boxPosition $ randomBox
+  return . (+ (Point2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition $ randomBox
 
 randomStar :: MonadRandom m => GameTicks -> [GameObject] -> m Star
 randomStar ticks xs = do
   p <- randomAbovePlatPosition xs
-  return $ Star p ticks
+  return $ Star (p - (Point2 0 (fromIntegral (gcTileSize `div` 2)))) ticks
 
 generateGame :: MonadRandom m => m [GameObject]
 generateGame = do
@@ -91,7 +91,7 @@ generateGame = do
       boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
   rawPlayerPos <- randomAbovePlatPosition boxes
   let player = Player {
-        playerPosition = rawPlayerPos - (Point2 0 (fromIntegral gcTileSize)),
+        playerPosition = rawPlayerPos + (Point2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize))),
         playerMode = Air,
         playerVelocity = Point2 0.0 0.0,
         playerWalkSince = Nothing

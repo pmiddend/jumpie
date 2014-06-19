@@ -43,7 +43,7 @@ gcPlatCount :: Int
 gcPlatCount = 15
 
 gcStars :: Int
-gcStars = 2
+gcStars = 3
 
 gcWSSize :: Real
 gcWSSize = 10.0
