@@ -9,7 +9,7 @@ import           Data.Bool                  (Bool (..), (||))
 import           Data.Eq                    ((==))
 import           Data.Function              (($), (.))
 import           Data.List                  (any, concatMap, length, lookup,
-                                             map)
+                                             map,(++),filter)
 import           Data.Maybe                 (fromMaybe)
 import           Graphics.UI.SDL.Enum       (Scancode, scancodeEscape,
                                              scancodeLeft, scancodeRight,
@@ -21,12 +21,12 @@ import           Jumpie.Commandize          (RenderCommand (RenderSprite),
                                              RenderPositionMode (..),
                                              commandizeGameState, optimizePlats)
 import           Jumpie.Game                (processGameObjects, testGameOver)
-import           Jumpie.GameConfig          (screenHeight, screenWidth)
+import           Jumpie.GameConfig          (screenHeight, screenWidth,gcStars)
 import           Jumpie.GameData            (GameData (GameData), GameDataM,
                                              gdKeydowns, runGame,
-                                             updateKeydowns, updateTicks)
+                                             updateKeydowns, updateTicks,gdCurrentTicks)
 import           Jumpie.GameGeneration      (generateGame, randomStar)
-import           Jumpie.GameObject          (isStar)
+import           Jumpie.GameObject          (isStar,GameObject(..))
 import           Jumpie.GameState           (GameState (GameState), gsGameOver,
                                              gsObjects)
 import           Jumpie.Geometry.Point      (Point2 (Point2))
@@ -63,8 +63,14 @@ stageMainLoop gameState = do
       gameData <- get
       let incomingActions = concatMap kdToAction (gdKeydowns gameData)
       newObjects <- processGameObjects gameState incomingActions
-      --remainingStars <- replicateM (length $ map isStar newObjects) randomStar
-      let newState = gameState { gsGameOver = testGameOver gameState, gsObjects = newObjects }
+      let currentStars = length . filter (== True) . map isStar $ newObjects
+      remainingStars <- replicateM
+                        (gcStars - currentStars)
+                        (randomStar (gdCurrentTicks gameData) newObjects)
+      let newState = gameState {
+            gsGameOver = testGameOver gameState,
+            gsObjects = newObjects ++ (map ObjectStar remainingStars)
+            }
       renderAll =<< (return . optimizePlats) =<< commandizeGameState gameState
       renderFinish
       stageMainLoop newState

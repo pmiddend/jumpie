@@ -54,7 +54,7 @@ processGameObject gs ias o = case o of
   ObjectBox b -> return [ObjectBox b]
   ObjectStar b -> do
     currentTicks <- gdCurrentTicks <$> get
-    if starInception b + gcStarLifetime > currentTicks
+    if starInception b + gcStarLifetime < currentTicks
       then return []
       else return [ObjectStar b]
   ObjectSensorLine _ -> return []
