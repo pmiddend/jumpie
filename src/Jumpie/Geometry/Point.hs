@@ -7,10 +7,13 @@ module Jumpie.Geometry.Point(
   vmult,
   pointFromTuple,
   pointToTuple,
-  pointToList) where
+  pointToList,
+  euclideanDistance
+  ) where
 
-import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger)
+import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger,Floating,sqrt)
 import Data.Functor(fmap,Functor)
+import Data.Function(($))
 import Control.Applicative(Applicative,(<*>),pure,liftA2)
 import Text.Show(Show)
 import Data.Eq(Eq,(==))
@@ -54,3 +57,7 @@ pointFromTuple (a,b) = Point2 a b
 
 pointToList :: Point2 a -> [a]
 pointToList (Point2 a b) = [a,b]
+
+euclideanDistance :: Floating a => Point2 a -> Point2 a -> a
+euclideanDistance a b = sqrt $ dot diff diff
+  where diff = a-b

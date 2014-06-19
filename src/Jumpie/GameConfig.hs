@@ -5,6 +5,7 @@ module Jumpie.GameConfig(
   gcPlayerMaxSpeed,
   gcStars,
   gcDec,
+  gcStarCollisionDistance,
   gcAir,
   gcGrv,
   gcAcc,
@@ -44,6 +45,9 @@ gcPlatCount = 15
 
 gcStars :: Int
 gcStars = 3
+
+gcStarCollisionDistance :: Real
+gcStarCollisionDistance = 17
 
 gcWSSize :: Real
 gcWSSize = 10.0

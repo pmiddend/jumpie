@@ -27,7 +27,7 @@ type RectReal = Rect PointReal
 type LineSegmentReal = LineSegment PointReal
 type LineSegmentInt = LineSegment PointInt
 
-data OutgoingAction = Collision
+data OutgoingAction = StarCollected
 
 data IncomingAction = PlayerLeft | PlayerRight | PlayerJump deriving(Eq)
 

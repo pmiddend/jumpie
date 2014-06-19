@@ -1,13 +1,13 @@
 module Jumpie.Game(processGameObjects,testGameOver) where
 
 import           Control.Applicative          ((<$>), (<|>))
-import           Control.Monad                (return)
-import           Control.Monad.State.Strict   (get)
+import           Control.Monad                (mapM,return)
+import           Control.Monad.State.Strict   (gets)
 import           Data.Bool                    (Bool (False, True), not, (&&),
                                                (||))
 import           Data.Eq                      ((==))
 import           Data.Function                (($), (.))
-import           Data.List                    (elem, filter, find, map, (++))
+import           Data.List                    (elem, filter, find, map, (++),unzip,concat)
 import           Data.Maybe                   (Maybe (..), fromJust, isJust,
                                                isNothing)
 import           Data.Monoid                  (First (First), getFirst, mconcat)
@@ -15,7 +15,7 @@ import           Data.Ord                     (min, (<), (>), (>=))
 import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
                                                gcGrv, gcJmp, gcPlayerHeight,
                                                gcPlayerMaxSpeed, gcStarLifetime,
-                                               gcWSSize, screenHeight)
+                                               gcWSSize, screenHeight,gcStarCollisionDistance)
 import           Jumpie.GameData              (GameDataM, gdCurrentTicks,
                                                gdTimeDelta)
 import           Jumpie.GameObject            (Box (Box), GameObject (..),
@@ -24,23 +24,25 @@ import           Jumpie.GameObject            (Box (Box), GameObject (..),
                                                boxPosition, isBox, isPlayer,
                                                playerMode, playerPosition,
                                                playerVelocity, playerWalkSince,
-                                               starInception)
+                                               starInception,Star,starPosition)
 import           Jumpie.GameState             (GameState, gsObjects)
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
 import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
-import           Jumpie.Geometry.Point        (Point2 (..))
+import           Jumpie.Geometry.Point        (Point2 (..),euclideanDistance)
 import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
 import           Jumpie.Geometry.Utility      (clampAbs)
 import           Jumpie.Maybe                 (ifMaybe)
-import           Jumpie.Monad                 (concatMapM)
 import           Jumpie.Time                  (TimeDelta, timeDelta)
 import           Jumpie.Types                 (IncomingAction (..),
-                                               LineSegmentReal, PointReal, Real)
-import           Prelude                      (Double, abs, fromIntegral,
+                                               LineSegmentReal, PointReal, Real,OutgoingAction(..))
+import           Prelude                      (Double, abs, fromIntegral,error,
                                                signum, (*), (+), (-))
+import Data.Bifunctor(bimap)
 
-processGameObjects :: GameState -> [IncomingAction] -> GameDataM [GameObject]
-processGameObjects gs actions = concatMapM (processGameObject gs actions) (gsObjects gs)
+processGameObjects :: GameState -> [IncomingAction] -> GameDataM ([GameObject],[OutgoingAction])
+processGameObjects gs actions = do
+  objectsnactions <- mapM (processGameObject gs actions) (gsObjects gs)
+  return . (bimap concat concat) . unzip $ objectsnactions
 
 testGameOver :: GameState -> Bool
 testGameOver os = case find isPlayer (gsObjects os) of
@@ -48,18 +50,28 @@ testGameOver os = case find isPlayer (gsObjects os) of
   Just (ObjectPlayer p) -> (pY . playerPosition) p > fromIntegral screenHeight
   Just _ -> True
 
-processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM [GameObject]
+processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM ([GameObject],[OutgoingAction])
 processGameObject gs ias o = case o of
   ObjectPlayer p -> processPlayerObject gs ias p
-  ObjectBox b -> return [ObjectBox b]
-  ObjectStar b -> do
-    currentTicks <- gdCurrentTicks <$> get
-    if starInception b + gcStarLifetime < currentTicks
-      then return []
-      else return [ObjectStar b]
-  ObjectSensorLine _ -> return []
+  ObjectBox b -> return ([ObjectBox b],[])
+  ObjectStar b -> processStar gs b
+  ObjectSensorLine _ -> return ([],[])
 
-processPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM [GameObject]
+processStar :: GameState -> Star -> GameDataM ([GameObject],[OutgoingAction])
+processStar gs b = do
+  currentTicks <- gets gdCurrentTicks
+  -- Stern abgelaufen?
+  if starInception b + gcStarLifetime < currentTicks
+    then return ([],[])
+    -- Stern kollidiert mit Spieler?
+    else case find isPlayer (gsObjects gs) of
+      Nothing -> return ([ObjectStar b],[])
+      Just (ObjectPlayer p) -> if playerPosition p `euclideanDistance` starPosition b < gcStarCollisionDistance
+                then return ([],[StarCollected])
+                else return ([ObjectStar b],[])
+      Just _ -> error "Player is not a player, wtf?"
+
+processPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM ([GameObject],[OutgoingAction])
 processPlayerObject gs ias p = case playerMode p of
   Ground -> processGroundPlayerObject gs ias p
   Air -> processAirPlayerObject gs ias p
@@ -107,9 +119,9 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
         cSLCollision = lineCollision boxes cSL
         cSRCollision = lineCollision boxes cSR
 
-processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM [GameObject]
+processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM ([GameObject],[OutgoingAction])
 processGroundPlayerObject gs ias p = do
-  t <- gdTimeDelta <$> get
+  t <- gets gdTimeDelta
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
         sensors = applySensors (gsObjects gs) (playerPosition p) 4.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
@@ -144,12 +156,12 @@ processGroundPlayerObject gs ias p = do
           playerVelocity = newPlayerVelocity,
           playerWalkSince = if newPlayerMode == Ground then (playerWalkSince p) else Nothing
           }
-  return $ [ObjectPlayer np] ++ sensorLines
+  return $ ([ObjectPlayer np] ++ sensorLines,[])
 
-processAirPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM [GameObject]
+processAirPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM ([GameObject],[OutgoingAction])
 processAirPlayerObject gs ias p = do
-  t <- gdTimeDelta <$> get
-  currentTicks <- gdCurrentTicks <$> get
+  t <- gets gdTimeDelta
+  currentTicks <- gets gdCurrentTicks
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
         sensors = applySensors (gsObjects gs) (playerPosition p) 0.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
@@ -206,4 +218,4 @@ processAirPlayerObject gs ias p = do
           playerVelocity = Point2 newPlayerVelocityX newPlayerVelocityY,
           playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
           }
-  return $ [ObjectPlayer np] ++ sensorLines
+  return $ ([ObjectPlayer np] ++ sensorLines,[])

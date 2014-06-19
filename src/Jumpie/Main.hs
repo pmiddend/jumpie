@@ -62,7 +62,7 @@ stageMainLoop gameState = do
     else do
       gameData <- get
       let incomingActions = concatMap kdToAction (gdKeydowns gameData)
-      newObjects <- processGameObjects gameState incomingActions
+      (newObjects,actions) <- processGameObjects gameState incomingActions
       let currentStars = length . filter (== True) . map isStar $ newObjects
       remainingStars <- replicateM
                         (gcStars - currentStars)
