@@ -18,7 +18,9 @@ module Jumpie.GameConfig(
   screenHeight,
   mediaDir,
   backgroundColor,
-  gcStarLifetime
+  gcStarLifetime,
+  gcStarWiggleHeight,
+  gcStarWiggleSpeed
   ) where
 
 import           Data.Int     (Int)
@@ -39,6 +41,12 @@ mediaDir = "media"
 
 gcPlatMaxLength :: Int
 gcPlatMaxLength = 5
+
+gcStarWiggleHeight :: Real
+gcStarWiggleHeight = 5
+
+gcStarWiggleSpeed :: Real
+gcStarWiggleSpeed = 10
 
 gcPlatCount :: Int
 gcPlatCount = 15

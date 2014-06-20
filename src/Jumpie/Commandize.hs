@@ -23,9 +23,9 @@ import           Data.String                 (String)
 import           Data.Word                   (Word8)
 import           Jumpie.Monad                (concatMapM)
 --import           Debug.Trace                 (trace)
-import           Control.Monad.State.Strict  (get)
+import           Control.Monad.State.Strict  (get,gets)
 
-import           Jumpie.GameConfig           (backgroundColor)
+import           Jumpie.GameConfig           (backgroundColor,gcStarWiggleHeight,gcStarWiggleSpeed)
 import           Jumpie.GameData             (GameData, GameDataM, gdAnims,
                                               gdCurrentTicks, gdSurfaces)
 import           Jumpie.GameObject           (Box (Box), BoxType (..),
@@ -47,7 +47,7 @@ import           Jumpie.Types                (LineSegmentInt, PointInt,
 import           Prelude                     (Double, Fractional, Integral, abs,
                                               div, error, error, floor,
                                               fromIntegral, mod, undefined, (*),
-                                              (+), (-), (/))
+                                              (+), (-), (/),sin)
 import           Text.Show                   (Show, show)
 
 type RGBColor = (Word8,Word8,Word8)
@@ -93,7 +93,10 @@ commandizeBox (Box p t) = return [
   ]
 
 commandizeStar :: Star -> GameDataM [RenderCommand]
-commandizeStar (Star pos _) = return [RenderSprite "star" (floor <$> pos) RenderPositionCenter]
+commandizeStar (Star pos t) = do
+  currentTicks <- gets gdCurrentTicks
+  let wiggledPos = pos + (Point2 0 (gcStarWiggleHeight * (sin (timeDelta (currentTicks `tickDelta` t)*gcStarWiggleSpeed))))
+  return [RenderSprite "star" (floor <$> wiggledPos) RenderPositionCenter]
 
 commandizeLine :: SensorLine -> GameDataM [RenderCommand]
 commandizeLine (SensorLine s) = return $ [RenderLine (255,0,0) (toIntLine s)]
