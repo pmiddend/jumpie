@@ -23,9 +23,11 @@ import           Data.String                 (String)
 import           Data.Word                   (Word8)
 import           Jumpie.Monad                (concatMapM)
 --import           Debug.Trace                 (trace)
-import           Control.Monad.State.Strict  (get,gets)
+import           Control.Monad.State.Strict  (get, gets)
 
-import           Jumpie.GameConfig           (backgroundColor,gcStarWiggleHeight,gcStarWiggleSpeed)
+import           Jumpie.GameConfig           (backgroundColor,
+                                              gcStarWiggleHeight,
+                                              gcStarWiggleSpeed)
 import           Jumpie.GameData             (GameData, GameDataM, gdAnims,
                                               gdCurrentTicks, gdSurfaces)
 import           Jumpie.GameObject           (Box (Box), BoxType (..),
@@ -46,8 +48,8 @@ import           Jumpie.Types                (LineSegmentInt, PointInt,
                                               PointReal)
 import           Prelude                     (Double, Fractional, Integral, abs,
                                               div, error, error, floor,
-                                              fromIntegral, mod, undefined, (*),
-                                              (+), (-), (/),sin)
+                                              fromIntegral, mod, sin, undefined,
+                                              (*), (+), (-), (/))
 import           Text.Show                   (Show, show)
 
 type RGBColor = (Word8,Word8,Word8)
@@ -78,7 +80,7 @@ compressPlatform _ = error "compressPlatform given something other than RenderSp
 commandizeGameState :: GameState -> GameDataM [RenderCommand]
 commandizeGameState gs = do
   commandizedObjects <- concatMapM commandizeObject (gsObjects gs)
-  return $ RenderBackground "background" : commandizedObjects
+  return $ FillScreen backgroundColor : RenderBackground "background" : commandizedObjects
 
 commandizeObject :: GameObject -> GameDataM [RenderCommand]
 commandizeObject ob = case ob of

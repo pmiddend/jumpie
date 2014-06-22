@@ -14,6 +14,7 @@ module Jumpie.SDLHelper(
   , renderFinish
   , processKeydowns
   , renderClear
+  , withMixer
   ) where
 
 import           Control.Monad         (return, (>>))
@@ -45,8 +46,10 @@ import           Data.Eq               (Eq, (==))
 import           Data.String           (String)
 import           Foreign.C.String      (withCStringLen)
 import           Graphics.UI.SDL.Enum  (windowPosUndefined, windowPosUndefined)
-import           Graphics.UI.SDL.Types (Renderer, Window)
-import           Graphics.UI.SDL.Types (Event (KeyboardEvent))
+import           Graphics.UI.SDL.Mixer (closeAudio, init, mixDefaultChannels,
+                                        mixDefaultFormat, mixDefaultFrequency,
+                                        openAudio, quit)
+import           Graphics.UI.SDL.Types (Event (KeyboardEvent), Renderer, Window)
 import           Jumpie.Types          (Keydowns, PointInt, RectInt)
 import           Prelude               (Num, RealFrac, error, floor, fromEnum,
                                         fromIntegral, undefined, (*), (+), (-))
@@ -80,6 +83,17 @@ errorIfNonZero action s = do
 
 renderFinish :: Renderer -> IO ()
 renderFinish renderer = SDLV.renderPresent renderer
+
+type ChunkSize = Int
+
+withMixer :: ChunkSize -> IO a -> IO a
+withMixer chunksize a = bracket acquireResource releaseResource (\_ -> a)
+  where acquireResource = do
+          init []
+          openAudio mixDefaultFrequency mixDefaultFormat mixDefaultChannels 1024
+        releaseResource _ = do
+          closeAudio
+          quit
 
 withWindow :: String -> (Window -> IO a) -> IO a
 withWindow title callback = withCStringLen title $ \windowTitle ->

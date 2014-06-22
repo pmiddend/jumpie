@@ -20,7 +20,8 @@ module Jumpie.GameConfig(
   backgroundColor,
   gcStarLifetime,
   gcStarWiggleHeight,
-  gcStarWiggleSpeed
+  gcStarWiggleSpeed,
+  gcAudioChunkSize
   ) where
 
 import           Data.Int     (Int)
@@ -97,3 +98,6 @@ gcTileSize = 35
 
 gcStarLifetime :: GameTicks
 gcStarLifetime = fromSeconds (3 :: Int)
+
+gcAudioChunkSize :: Int
+gcAudioChunkSize = 1024

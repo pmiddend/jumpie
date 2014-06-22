@@ -19,7 +19,8 @@ import           Jumpie.Commandize          (RenderCommand (RenderSprite),
                                              RenderPositionMode (..),
                                              commandizeGameState, optimizePlats)
 import           Jumpie.Game                (processGameObjects, testGameOver)
-import           Jumpie.GameConfig          (gcStars, screenHeight, screenWidth)
+import           Jumpie.GameConfig          (gcAudioChunkSize, gcStars,
+                                             screenHeight, screenWidth)
 import           Jumpie.GameData            (GameData (..), GameDataM,
                                              gdCurrentTicks, gdKeydowns,
                                              runGame, updateKeydowns,
@@ -32,15 +33,15 @@ import           Jumpie.Geometry.Point      (Point2 (Point2))
 import           Jumpie.ImageData           (readAllDescFiles)
 import           Jumpie.List                (countBy)
 import           Jumpie.Render              (render, renderAll, renderFinish)
-import           Jumpie.SDLHelper           (pollEvents, withRenderer,
-                                             withWindow)
+import           Jumpie.SDLHelper           (pollEvents, withMixer,
+                                             withRenderer, withWindow)
 import           Jumpie.Time                (TimeDelta (TimeDelta), getTicks)
 import           Jumpie.Types               (IncomingAction (..),
                                              isStarCollected)
 import           Prelude                    (Double, Fractional, Integral, abs,
                                              div, error, floor, fromIntegral,
                                              mod, undefined, (*), (+), (-), (/))
-import           System.IO                  (IO)
+import           System.IO                  (IO, putStrLn)
 import           System.Random              (getStdGen)
 
 gameoverMainLoop :: GameState -> GameDataM ()
@@ -92,26 +93,29 @@ outerGameOver events = any outerGameOver' events
 
 main :: IO ()
 main =
-  withImgInit [InitPNG] $ do
-    withWindow "jumpie 0.1" $ \window -> do
-      withRenderer window screenWidth screenHeight $ \renderer -> do
-        (images,anims) <- readAllDescFiles renderer
-        ticks <- getTicks
-        g <- getStdGen
-        let gameData = GameData {
-            gdSurfaces = images
-          , gdAnims = anims
-          , gdRenderer = renderer
-          , gdCurrentTicks = ticks
-          , gdTimeDelta = TimeDelta 0
-          , gdKeydowns = []
-          }
-        let initialGameState = GameState {
-            gsObjects = (evalRand generateGame g)
-          , gsGameOver = False
-          , gsStarsCollected = 0
-          , gsStarsTotal = 10
-          }
-        (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop initialGameState
-        _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
-        return ()
+--  withMixer gcAudioChunkSize $ do
+--    putStrLn "lol"
+    withImgInit [InitPNG] $ do
+      withWindow "jumpie 0.1" $ \window -> do
+        withRenderer window screenWidth screenHeight $ \renderer -> do
+          (images,anims) <- readAllDescFiles renderer
+          ticks <- getTicks
+          g <- getStdGen
+          let gameData = GameData {
+              gdSurfaces = images
+            , gdAnims = anims
+            , gdRenderer = renderer
+            , gdCurrentTicks = ticks
+            , gdTimeDelta = TimeDelta 0
+            , gdKeydowns = []
+            }
+          let initialGameState = GameState {
+              gsObjects = (evalRand generateGame g)
+            , gsGameOver = False
+            , gsStarsCollected = 0
+            , gsStarsTotal = 10
+            }
+          (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop initialGameState
+          _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
+          return ()
+
