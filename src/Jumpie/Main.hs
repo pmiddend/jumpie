@@ -15,6 +15,7 @@ import           Graphics.UI.SDL.Enum       (Scancode, scancodeEscape,
 import           Graphics.UI.SDL.Image      (InitFlag (..), withImgInit)
 import           Graphics.UI.SDL.Types      (Event (QuitEvent, KeyboardEvent),
                                              Keysym (..))
+import           Jumpie.AudioData           (readAllSoundFiles)
 import           Jumpie.Commandize          (RenderCommand (RenderSprite),
                                              RenderPositionMode (..),
                                              commandizeGameState, optimizePlats)
@@ -93,8 +94,10 @@ outerGameOver events = any outerGameOver' events
 
 main :: IO ()
 main =
---  withMixer gcAudioChunkSize $ do
---    putStrLn "lol"
+  withMixer gcAudioChunkSize $ do
+    sounds <- readAllSoundFiles
+    return ()
+  {-
     withImgInit [InitPNG] $ do
       withWindow "jumpie 0.1" $ \window -> do
         withRenderer window screenWidth screenHeight $ \renderer -> do
@@ -118,4 +121,4 @@ main =
           (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop initialGameState
           _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
           return ()
-
+-}

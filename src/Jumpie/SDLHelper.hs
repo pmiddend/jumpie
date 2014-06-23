@@ -15,45 +15,57 @@ module Jumpie.SDLHelper(
   , processKeydowns
   , renderClear
   , withMixer
+  , withFileRWop
+  , loadSound
   ) where
 
-import           Control.Monad         (return, (>>))
-import           Data.Bool             (Bool (..))
-import           Data.Function         (($), (.))
-import           Data.Int              (Int)
-import           Data.List             (filter, map, union, (++), (\\))
-import           Data.Tuple            (fst)
-import           Foreign.Marshal.Array (allocaArray, peekArray)
-import           Foreign.Marshal.Utils (with)
-import           Graphics.UI.SDL.Enum  (eventActionGetEvent,
-                                        eventTypeFirstEvent, eventTypeKeyDown,
-                                        eventTypeKeyUp, eventTypeLastEvent,
-                                        windowFlagResizable)
-import           Graphics.UI.SDL.Event (peepEvents, pumpEvents)
-import qualified Graphics.UI.SDL.Types as SDLT
-import qualified Graphics.UI.SDL.Video as SDLV
+import           Control.Monad               (return, (>>), (>>=))
+import           Data.Bool                   (Bool (..))
+import           Data.Function               (($), (.))
+import           Data.Int                    (Int)
+import           Data.List                   (filter, map, union, (++), (\\))
+import           Data.Tuple                  (fst)
+import           Foreign.Marshal.Array       (allocaArray, peekArray)
+import           Foreign.Marshal.Utils       (with)
+import           Foreign.Storable            (peek)
+import           Graphics.UI.SDL.Enum        (eventActionGetEvent,
+                                              eventTypeFirstEvent,
+                                              eventTypeKeyDown, eventTypeKeyUp,
+                                              eventTypeLastEvent,
+                                              windowFlagResizable)
+import           Graphics.UI.SDL.Event       (peepEvents, pumpEvents)
+import           Graphics.UI.SDL.Filesystem  (rwClose, rwFromFile)
+import qualified Graphics.UI.SDL.Types       as SDLT
+import qualified Graphics.UI.SDL.Video       as SDLV
 --import           Jumpie.Bresenham             (bresenham)
 --import           Jumpie.Debug                 (traceShowId)
 --import           Jumpie.Geometry.Intersection (lineSegmentInsideRect)
 --import           Jumpie.Geometry.LineSegment  (LineSegment)
-import           Jumpie.Geometry.Point (Point2 (Point2))
-import           Jumpie.Geometry.Rect  (Rect (Rect), dimensions)
+import           Jumpie.Geometry.Point       (Point2 (Point2))
+import           Jumpie.Geometry.Rect        (Rect (Rect), dimensions)
 --import           Jumpie.Geometry.Rect         (inside)
-import           Jumpie.ImageData      (SurfaceData)
+import           Jumpie.ImageData            (SurfaceData)
 --import           Jumpie.Monad                 (when_)
-import           Control.Exception     (bracket)
-import           Data.Eq               (Eq, (==))
-import           Data.String           (String)
-import           Foreign.C.String      (withCStringLen)
-import           Graphics.UI.SDL.Enum  (windowPosUndefined, windowPosUndefined)
-import           Graphics.UI.SDL.Mixer (closeAudio, init, mixDefaultChannels,
-                                        mixDefaultFormat, mixDefaultFrequency,
-                                        openAudio, quit)
-import           Graphics.UI.SDL.Types (Event (KeyboardEvent), Renderer, Window)
-import           Jumpie.Types          (Keydowns, PointInt, RectInt)
-import           Prelude               (Num, RealFrac, error, floor, fromEnum,
-                                        fromIntegral, undefined, (*), (+), (-))
-import           System.IO             (IO)
+import           Control.Exception           (bracket)
+import           Data.Eq                     (Eq, (==))
+import           Data.String                 (String)
+import           Foreign.C.String            (withCString, withCStringLen)
+import           Graphics.UI.SDL.Enum        (windowPosUndefined,
+                                              windowPosUndefined)
+import           Graphics.UI.SDL.Mixer       (closeAudio, init, loadWAVRW,
+                                              mixDefaultChannels,
+                                              mixDefaultFormat,
+                                              mixDefaultFrequency, openAudio,
+                                              quit)
+import           Graphics.UI.SDL.Mixer.Types (Chunk)
+import           Graphics.UI.SDL.Types       (Event (KeyboardEvent), Renderer,
+                                              Window)
+import           Jumpie.Types                (Keydowns, PointInt, RectInt)
+import           Prelude                     (Num, RealFrac, error, floor,
+                                              fromEnum, fromIntegral, undefined,
+                                              (*), (+), (-))
+import           System.FilePath
+import           System.IO                   (IO)
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
 processKeydowns k es = (k \\ keyUps) `union` keyDowns
@@ -76,6 +88,16 @@ screenAbsoluteHeight = 0
 windowFlags :: Int
 windowFlags = windowFlagResizable
 
+withFileRWop :: String -> (SDLT.RWops -> IO a) -> IO a
+withFileRWop fp' c = do
+  withCString fp' $ \fp -> do
+    withCString "rb" $ \r -> do
+      bracket (rwFromFile fp r) rwClose $ \ptrrw -> do
+        peek ptrrw >>= c
+
+loadSound :: FilePath -> IO Chunk
+loadSound path = withFileRWop path $ \rwop -> loadWAVRW rwop False
+
 errorIfNonZero :: (Num a,Eq a) => IO a -> String -> IO ()
 errorIfNonZero action s = do
   result <- action
@@ -90,7 +112,7 @@ withMixer :: ChunkSize -> IO a -> IO a
 withMixer chunksize a = bracket acquireResource releaseResource (\_ -> a)
   where acquireResource = do
           init []
-          openAudio mixDefaultFrequency mixDefaultFormat mixDefaultChannels 1024
+          openAudio mixDefaultFrequency mixDefaultFormat mixDefaultChannels chunksize
         releaseResource _ = do
           closeAudio
           quit

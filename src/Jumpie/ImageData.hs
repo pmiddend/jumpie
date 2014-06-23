@@ -14,10 +14,10 @@ module Jumpie.ImageData(
 
 import           Control.Applicative    ((*>), (<$>), (<*), (<*>))
 import           Control.Category       ((>>>))
-import           Control.Monad          (filterM, return, (>>=))
+import           Control.Monad          (return, (>>=))
 import           Data.Either            (Either (..))
 import           Data.Eq                ((==))
-import           Data.Function          (($), (.))
+import           Data.Function          (($))
 import           Data.Int               (Int)
 import           Data.List              (filter, foldr, map, (++))
 import           Data.Map.Strict        (empty, fromList, union)
@@ -28,13 +28,13 @@ import           Data.Traversable       (traverse)
 import           Data.Tuple             (fst, snd)
 import           Graphics.UI.SDL.Image  (imgLoadTexture)
 import qualified Graphics.UI.SDL.Types  as SDLT
+import           Jumpie.Filesystem      (getFilesInDir)
 import           Jumpie.GameConfig      (mediaDir)
 import           Jumpie.Geometry.Point  (Point2 (Point2))
 import           Jumpie.Geometry.Rect   (Rect (Rect))
 import           Jumpie.Parsec          (int, safeParseFromFile)
 import           Jumpie.Types           (RectInt)
 import           Prelude                (Char, error)
-import           System.Directory       (doesFileExist, getDirectoryContents)
 import           System.FilePath
 import           System.IO              (IO)
 import           Text.Parsec            (many1)
@@ -62,10 +62,6 @@ data Animation = Animation {
 type AnimId = String
 
 type AnimMap = Map AnimId Animation
-
--- Holt nur die Files (ohne . und ..) aus einem Verzeichnis
-getFilesInDir :: FilePath -> IO [FilePath]
-getFilesInDir dir = getDirectoryContents dir >>= filterM (doesFileExist . (mediaDir </>))
 
 -- Holt alle "Descriptorfiles" (also die mit .txt enden) aus dem Directory
 getDescFilesInDir :: FilePath -> IO [ImageDescFile]
