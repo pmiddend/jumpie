@@ -56,7 +56,7 @@ type RGBColor = (Word8,Word8,Word8)
 
 data RenderPositionMode = RenderPositionCenter | RenderPositionTopLeft deriving(Show,Eq)
 
-data RenderCommand = FillScreen RGBColor |
+data RenderCommand = FillScreen Color |
                      RenderSprite String PointInt RenderPositionMode |
                      RenderBackground String |
                      RenderLine RGBColor LineSegmentInt deriving(Show,Eq)

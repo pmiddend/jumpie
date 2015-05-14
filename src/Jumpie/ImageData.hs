@@ -26,8 +26,6 @@ import           Data.Maybe             (Maybe (Just, Nothing), mapMaybe)
 import           Data.String
 import           Data.Traversable       (traverse)
 import           Data.Tuple             (fst, snd)
-import           Graphics.UI.SDL.Image  (imgLoadTexture)
-import qualified Graphics.UI.SDL.Types  as SDLT
 import           Jumpie.Filesystem      (getFilesInDir)
 import           Jumpie.GameConfig      (mediaDir)
 import           Jumpie.Geometry.Point  (Point2 (Point2))

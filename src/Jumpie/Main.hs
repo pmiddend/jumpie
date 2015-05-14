@@ -1,5 +1,6 @@
 module Main where
 
+{-
 import           Control.Monad              (replicateM, return, unless, (=<<))
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.Random       (evalRand)
@@ -9,19 +10,11 @@ import           Data.Eq                    ((==))
 import           Data.Function              (($), (.))
 import           Data.List                  (any, concatMap, lookup, map, (++))
 import           Data.Maybe                 (fromMaybe)
-import           Graphics.UI.SDL.Enum       (Scancode, scancodeEscape,
-                                             scancodeLeft, scancodeRight,
-                                             scancodeUp)
-import           Graphics.UI.SDL.Image      (InitFlag (..), withImgInit)
-import           Graphics.UI.SDL.Types      (Event (QuitEvent, KeyboardEvent),
-                                             Keysym (..))
 import           Jumpie.AudioData           (readAllSoundFiles)
 import           Jumpie.Commandize          (RenderCommand (RenderSprite),
                                              RenderPositionMode (..),
                                              commandizeGameState, optimizePlats)
 import           Jumpie.Game                (processGameObjects, testGameOver)
-import           Jumpie.GameConfig          (gcAudioChunkSize, gcStars,
-                                             screenHeight, screenWidth)
 import           Jumpie.GameData            (GameData (..), GameDataM,
                                              gdCurrentTicks, gdKeydowns,
                                              runGame, updateKeydowns,
@@ -34,9 +27,6 @@ import           Jumpie.Geometry.Point      (Point2 (Point2))
 import           Jumpie.ImageData           (readAllDescFiles)
 import           Jumpie.List                (countBy)
 import           Jumpie.Render              (render, renderAll, renderFinish)
-import           Jumpie.SDLHelper           (pollEvents, withMixer,
-                                             withRenderer, withWindow)
-import           Jumpie.Time                (TimeDelta (TimeDelta), getTicks)
 import           Jumpie.Types               (IncomingAction (..),
                                              isStarCollected)
 import           Prelude                    (Double, Fractional, Integral, abs,
@@ -44,6 +34,12 @@ import           Prelude                    (Double, Fractional, Integral, abs,
                                              mod, undefined, (*), (+), (-), (/))
 import           System.IO                  (IO, putStrLn)
 import           System.Random              (getStdGen)
+-}
+import           Jumpie.GameConfig          (screenHeight, screenWidth)
+import Wrench.Time
+import Wrench.Engine(withPlatform)
+import Wrench.ImageData(readMediaFiles)
+import Wrench.Platform
 
 gameoverMainLoop :: GameState -> GameDataM ()
 gameoverMainLoop gameState = do
@@ -94,31 +90,24 @@ outerGameOver events = any outerGameOver' events
 
 main :: IO ()
 main =
-  withMixer gcAudioChunkSize $ do
-    sounds <- readAllSoundFiles
+  withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ \platform -> do
+    (images,anims) <- readMediaFiles platform
+    ticks <- getTicks
+    g <- getStdGen
+    let gameData = GameData {
+          gdSurfaces = images
+        , gdAnims = anims
+        , gdPlatform = platform
+        , gdCurrentTicks = ticks
+        , gdTimeDelta = TimeDelta 0
+        , gdKeydowns = []
+        }
+    let initialGameState = GameState {
+          gsObjects = (evalRand generateGame g)
+        , gsGameOver = False
+        , gsStarsCollected = 0
+        , gsStarsTotal = 10
+        }
+    (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop initialGameState
+    _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()
-  {-
-    withImgInit [InitPNG] $ do
-      withWindow "jumpie 0.1" $ \window -> do
-        withRenderer window screenWidth screenHeight $ \renderer -> do
-          (images,anims) <- readAllDescFiles renderer
-          ticks <- getTicks
-          g <- getStdGen
-          let gameData = GameData {
-              gdSurfaces = images
-            , gdAnims = anims
-            , gdRenderer = renderer
-            , gdCurrentTicks = ticks
-            , gdTimeDelta = TimeDelta 0
-            , gdKeydowns = []
-            }
-          let initialGameState = GameState {
-              gsObjects = (evalRand generateGame g)
-            , gsGameOver = False
-            , gsStarsCollected = 0
-            , gsStarsTotal = 10
-            }
-          (lastGameState,lastGameData) <- runGame g gameData $ stageMainLoop initialGameState
-          _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
-          return ()
--}

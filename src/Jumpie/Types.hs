@@ -14,12 +14,12 @@ module Jumpie.Types(
 
 import           Data.Eq                     (Eq)
 import           Data.Int                    (Int)
-import           Graphics.UI.SDL.Enum        (Scancode)
 import           Jumpie.Geometry.LineSegment (LineSegment)
 import           Jumpie.Geometry.Point       (Point2 (..))
 import           Jumpie.Geometry.Rect        (Rect ())
 import           Prelude                     (Double)
 import Data.Bool(Bool(..))
+import Wrench.Keysym(Keysym)
 
 type RectInt = Rect (Point2 Int)
 
@@ -37,4 +37,4 @@ isStarCollected StarCollected = True
 
 data IncomingAction = PlayerLeft | PlayerRight | PlayerJump deriving(Eq)
 
-type Keydowns = [Scancode]
+type Keydowns = [Keysym]

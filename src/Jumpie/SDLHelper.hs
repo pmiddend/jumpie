@@ -19,6 +19,7 @@ module Jumpie.SDLHelper(
   , loadSound
   ) where
 
+{-
 import           Control.Monad               (return, (>>), (>>=))
 import           Data.Bool                   (Bool (..))
 import           Data.Function               (($), (.))
@@ -191,3 +192,5 @@ fromSDLRect (SDLT.Rect x y w h) = Rect (Point2 (fromIntegral x) (fromIntegral y)
 
 toSDLRect :: Rect (Point2 Int) -> SDLT.Rect
 toSDLRect (Rect (Point2 l t) (Point2 r b)) = SDLT.Rect (fromIntegral l) (fromIntegral t) (fromIntegral (r-l)) (fromIntegral (b-t))
+
+-}
