@@ -2,9 +2,8 @@ module Jumpie.GameState(
   GameState(..)
   ) where
 
-import           Data.Bool         (Bool)
 import           Jumpie.GameObject (GameObject)
-import Data.Int(Int)
+import ClassyPrelude
 
 data GameState = GameState {
     gsObjects :: [GameObject]

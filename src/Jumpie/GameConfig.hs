@@ -27,9 +27,8 @@ module Jumpie.GameConfig(
 import           Data.Int     (Int)
 import           Data.String  (String)
 import           Data.Word    (Word8)
-import           Jumpie.Time  (GameTicks, fromSeconds)
+import Wrench.Time
 import           Jumpie.Types (Real)
-import           Prelude      (div, fromIntegral, (*), (+), (-), (/))
 
 backgroundColor :: (Word8,Word8,Word8)
 backgroundColor = (94,129,162)
@@ -96,8 +95,8 @@ gcDec = 0.5
 gcTileSize :: Int
 gcTileSize = 35
 
-gcStarLifetime :: GameTicks
-gcStarLifetime = fromSeconds (3 :: Int)
+gcStarLifetime :: TimeDelta
+gcStarLifetime = fromSeconds 3
 
 gcAudioChunkSize :: Int
 gcAudioChunkSize = 1024

@@ -31,8 +31,10 @@ executable jumpie
                        parsec,
                        random,
                        bifunctors,
-                       wrench
-  ghc-options: -Wall -XNoImplicitPrelude
+                       wrench,
+                       classy-prelude
+  ghc-options: -Wall
+  extensions: NoImplicitPrelude
 
 --test-suite Main
 --  hs-source-dirs:      test,

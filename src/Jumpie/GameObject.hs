@@ -20,13 +20,10 @@ module Jumpie.GameObject(
   isSensorLine
   ) where
 
-import           Data.Bool                   (Bool (..))
-import           Data.Eq                     (Eq)
-import           Data.Maybe                  (Maybe (..))
 import           Jumpie.Geometry.LineSegment (LineSegment)
-import           Jumpie.Time                 (GameTicks)
 import           Jumpie.Types                (PointReal, RectReal)
-import           Text.Show                   (Show)
+import Wrench.Time
+import ClassyPrelude hiding(Real)
 
 data PlayerMode = Ground | Air deriving(Eq,Show)
 
@@ -34,12 +31,12 @@ data Player = Player {
   playerPosition  :: PointReal,
   playerMode      :: PlayerMode,
   playerVelocity  :: PointReal,
-  playerWalkSince :: Maybe GameTicks
+  playerWalkSince :: Maybe TimeTicks
   } deriving(Show)
 
 data Star = Star {
   starPosition  :: PointReal,
-  starInception :: GameTicks
+  starInception :: TimeTicks
   } deriving(Show)
 
 data GameObject = ObjectPlayer Player | ObjectBox Box | ObjectSensorLine SensorLine | ObjectStar Star deriving(Show)

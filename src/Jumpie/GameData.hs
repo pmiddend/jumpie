@@ -1,3 +1,4 @@
+{-# LANGUAGE NoImplicitPrelude #-}
 module Jumpie.GameData(
     GameData(..)
   , updateKeydowns
@@ -6,7 +7,7 @@ module Jumpie.GameData(
   , runGame
   ) where
 
-import           Data.List                  (filter, map, union, (++), (\\))
+import qualified Data.Set as S
 import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.State.Strict (StateT, get, gets, put, runStateT)
 
@@ -20,29 +21,30 @@ import           Jumpie.Time                (GameTicks, TimeDelta (TimeDelta),
                                              getTicks, tickDelta)
 import           Jumpie.Types               (Keydowns)
 -}
-import           Prelude                    (div, (*), (-))
 import           System.IO                  (IO)
 import           System.Random              (StdGen)
 import Wrench.ImageData(SurfaceMap,AnimMap)
 import Wrench.Platform
 import Wrench.Time
 import Wrench.Event
+import Wrench.KeyMovement
 import           Jumpie.Types               (Keydowns)
+import ClassyPrelude
 
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (PlatformImage p)
   , gdAnims        :: AnimMap
-  , gdPlatform     :: Platform p
+  , gdPlatform     :: p
   , gdCurrentTicks :: !TimeTicks
   , gdTimeDelta    :: !TimeDelta
   , gdKeydowns     :: !Keydowns
   }
 
-type GameDataBaseM = StateT GameData IO
+type GameDataBaseM p = StateT (GameData p) IO
 
-type GameDataM = RandT StdGen GameDataBaseM
+type GameDataM p = RandT StdGen (GameDataBaseM p)
 
-updateTicks :: GameDataM ()
+updateTicks :: GameDataM p ()
 updateTicks = do
   oldTicks <- gets gdCurrentTicks
   newTicks <- liftIO getTicks
@@ -54,21 +56,21 @@ updateTicks = do
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
 processKeydowns k es = (k \\ keyUps) `union` keyDowns
-  where keyUps = (map toKey  . filter isKeyUp) es
-        keyDowns = (map toKey  . filter isKeyDown) es
-        isKeyUp (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyUp
+  where keyUps = S.fromList ((map toKey  . filter isKeyUp) es)
+        keyDowns = S.fromList ((map toKey  . filter isKeyDown) es)
+        isKeyUp (Keyboard KeyUp _ _) = True
         isKeyUp _ = False
-        isKeyDown (KeyboardEvent state _ _ _ _ _) = state == eventTypeKeyDown
+        isKeyDown (Keyboard KeyDown _ _) = True
         isKeyDown _ = False
         toKey e = case e of
-          KeyboardEvent _ _ _ _ _ (SDLT.Keysym l _ _) -> l
+          Keyboard _ _ keysym -> keysym
           _ -> undefined
 
-updateKeydowns :: [Event] -> GameDataM ()
+updateKeydowns :: [Event] -> GameDataM p ()
 updateKeydowns events = do
   oldKeydowns <- gets gdKeydowns
   s <- get
   put s { gdKeydowns = processKeydowns oldKeydowns events }
 
-runGame :: StdGen -> GameData -> GameDataM a -> IO (a,GameData)
+runGame :: StdGen -> GameData p -> GameDataM p a -> IO (a,GameData p)
 runGame r gameData game = runStateT (evalRandT game r) gameData
