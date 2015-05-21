@@ -8,20 +8,12 @@ module Jumpie.GameData(
   ) where
 
 import qualified Data.Set as S
-import           Control.Monad.IO.Class     (liftIO)
 import           Control.Monad.State.Strict (StateT, get, gets, put, runStateT)
 
 
 import           Jumpie.GameConfig          (gcTimeMultiplier)
 
 import           Control.Monad.Random       (RandT, evalRandT)
-{-
-import           Jumpie.SDLHelper           (processKeydowns)
-import           Jumpie.Time                (GameTicks, TimeDelta (TimeDelta),
-                                             getTicks, tickDelta)
-import           Jumpie.Types               (Keydowns)
--}
-import           System.IO                  (IO)
 import           System.Random              (StdGen)
 import Wrench.ImageData(SurfaceMap,AnimMap)
 import Wrench.Platform

@@ -32,7 +32,8 @@ executable jumpie
                        random,
                        bifunctors,
                        wrench,
-                       classy-prelude
+                       classy-prelude,
+                       lens
   ghc-options: -Wall
   extensions: NoImplicitPrelude
 

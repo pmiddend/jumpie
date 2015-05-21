@@ -18,13 +18,10 @@ import           Jumpie.GameData            (GameData (..), GameDataM,
                                              gdCurrentTicks, gdKeydowns,
                                              runGame, updateKeydowns,
                                              updateTicks)
-import           Jumpie.GameObject          (GameObject (..), isStar)
 import           Jumpie.GameState           (GameState (..), gsGameOver,
                                              gsObjects)
 import           Jumpie.Geometry.Point      (Point2 (Point2))
 import           Jumpie.ImageData           (readAllDescFiles)
-import           Jumpie.List                (countBy)
-import           Jumpie.Render              (render, renderAll, renderFinish)
 import           Jumpie.Types               (IncomingAction (..),
                                              isStarCollected)
 import           Prelude                    (Double, Fractional, Integral, abs,
@@ -32,8 +29,11 @@ import           Prelude                    (Double, Fractional, Integral, abs,
                                              mod, undefined, (*), (+), (-), (/))
 import           System.IO                  (IO, putStrLn)
 -}
+import           Jumpie.GameObject          (GameObject (..), isStar)
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
+import           Jumpie.Render              (render, renderAll, renderFinish)
+import           Jumpie.List                (countBy)
 import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
 import           Jumpie.Game

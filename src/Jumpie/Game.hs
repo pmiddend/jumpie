@@ -1,12 +1,9 @@
 module Jumpie.Game(processGameObjects,testGameOver) where
 
-import           Control.Applicative          ((<|>))
 import           Control.Monad.State.Strict   (gets)
-import           Data.Maybe                   (Maybe (..), fromJust, isJust,
-                                               isNothing)
-import           Data.Monoid                  (First (First), getFirst, mconcat)
+import           Data.Maybe                   (fromJust)
+import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
-import           Data.Ord                     (min, (<), (>), (>=))
 import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
                                                gcGrv, gcJmp, gcPlayerHeight,
                                                gcPlayerMaxSpeed, gcStarLifetime,
@@ -27,11 +24,9 @@ import           Jumpie.Geometry.Point        (Point2 (..),euclideanDistance)
 import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
 import           Jumpie.Geometry.Utility      (clampAbs)
 import           Jumpie.Maybe                 (ifMaybe)
-import           Jumpie.Time                  (TimeDelta, timeDelta)
 import           Jumpie.Types                 (IncomingAction (..),
                                                LineSegmentReal, PointReal, Real,OutgoingAction(..))
 import ClassyPrelude hiding(Real)
-import Data.Bifunctor(bimap)
 
 processGameObjects :: GameState -> [IncomingAction] -> GameDataM p ([GameObject],[OutgoingAction])
 processGameObjects gs actions = do
@@ -126,7 +121,7 @@ processGroundPlayerObject gs ias p = do
           Just (ObjectBox (Box r _)) -> if (pX . center) r < (pX . playerPosition) p
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
-          _ -> (pX . playerPosition) p + timeDelta t * (pX . playerVelocity) p
+          _ -> (pX . playerPosition) p + toSeconds t * (pX . playerVelocity) p
         newPlayerPositionY = case fCollision of
           Just (ObjectBox (Box r _)) -> top r - gcPlayerHeight
           _ -> (pY . playerPosition) p
@@ -181,12 +176,12 @@ processAirPlayerObject gs ias p = do
           Just (ObjectBox (Box r _)) -> if (pX . center) r < oldPlayerPositionX
                                      then (right r) + gcWSSize + 1.0
                                      else (left r) - (gcWSSize + 1.0)
-          _ -> oldPlayerPositionX + timeDelta t * oldPlayerVelocityX
+          _ -> oldPlayerPositionX + toSeconds t * oldPlayerVelocityX
         newPlayerPositionY = case cCollision of
           Just b@(ObjectBox (Box r _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
                                         then bottom r + gcPlayerHeight
-                                        else oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
-          _ -> oldPlayerPositionY + timeDelta t * oldPlayerVelocityY
+                                        else oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
+          _ -> oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
         playerAcc = if PlayerLeft `elem` ias
                     then Just (-gcAir)
                     else
@@ -199,10 +194,10 @@ processAirPlayerObject gs ias p = do
                                Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
                                Nothing -> airDrag oldPlayerVelocityX
         newPlayerVelocityY = if oldPlayerVelocityY < 0.0 && isJust cCollision && playerIsAboveBox (fromJust cCollision)
-                             then timeDelta t * gcGrv
+                             then toSeconds t * gcGrv
                              else if oldPlayerVelocityY < -4.0 && not (PlayerJump `elem` ias)
                                   then -4.0
-                                  else oldPlayerVelocityY + timeDelta t * gcGrv
+                                  else oldPlayerVelocityY + toSeconds t * gcGrv
         airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125
                      then xv * 0.9685
                      else xv

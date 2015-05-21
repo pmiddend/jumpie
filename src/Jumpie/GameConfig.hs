@@ -24,14 +24,13 @@ module Jumpie.GameConfig(
   gcAudioChunkSize
   ) where
 
-import           Data.Int     (Int)
-import           Data.String  (String)
-import           Data.Word    (Word8)
 import Wrench.Time
+import Wrench.Color
 import           Jumpie.Types (Real)
+import ClassyPrelude hiding(Real)
 
-backgroundColor :: (Word8,Word8,Word8)
-backgroundColor = (94,129,162)
+backgroundColor :: Color
+backgroundColor = mkColorFromRgba 94 129 162 255
 
 screenWidth,screenHeight :: Int
 screenWidth = 1200

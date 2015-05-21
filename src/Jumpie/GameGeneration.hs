@@ -17,7 +17,6 @@ import           Jumpie.GameObject      (Box (Box), BoxType (..),
 import           Jumpie.Geometry.Point  (Point2 (Point2))
 import           Jumpie.Geometry.Rect   (Rect (Rect), rectTopLeft)
 import           Jumpie.Random          (randomElemM)
-import           Jumpie.Time            (GameTicks)
 import           Jumpie.Types           (PointInt, PointReal, RectInt)
 --import Jumpie.Debug(traceShowId)
 import           Control.Applicative    ((<$>))
@@ -31,6 +30,7 @@ import           Data.Maybe             (Maybe (Nothing), maybeToList)
 import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
                                          pTiles, randomPlatform, validPlatforms)
 import           Prelude                (div, fromIntegral, (*), (+), (-), (/))
+import Wrench.Time
 
   {-
 initialPlayer :: Player
@@ -79,7 +79,7 @@ randomAbovePlatPosition xs = do
   randomBox <- randomElemM $ concatMap (maybeToList . maybeBox) xs
   return . (+ (Point2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition $ randomBox
 
-randomStar :: MonadRandom m => GameTicks -> [GameObject] -> m Star
+randomStar :: MonadRandom m => TimeTicks -> [GameObject] -> m Star
 randomStar ticks xs = do
   p <- randomAbovePlatPosition xs
   return $ Star (p - (Point2 0 (fromIntegral (gcTileSize `div` 2)))) ticks

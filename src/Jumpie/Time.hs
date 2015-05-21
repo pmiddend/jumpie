@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Jumpie.Time(
+  {-
   TimeDelta(TimeDelta),
   timeDelta,
   GameTicks(GameTicks),
@@ -8,6 +9,7 @@ module Jumpie.Time(
   fromSeconds,
   fromNanoSeconds,
   tickDelta
+-}
   ) where
 
 import           Control.Monad (return)
