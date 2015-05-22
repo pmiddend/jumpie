@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Jumpie.Commandize(
   RenderCommand(..),
   RenderPositionMode(..),
@@ -7,8 +8,7 @@ module Jumpie.Commandize(
 
 import Data.List((!!))
 import           Data.Map.Strict             ((!))
-import           Data.Maybe                  (fromJust, isNothing)
-import           Data.Word                   (Word8)
+import           Data.Maybe                  (fromJust)
 import           Jumpie.Monad                (concatMapM)
 --import           Debug.Trace                 (trace)
 import           Control.Monad.State.Strict  (get, gets)
@@ -27,29 +27,26 @@ import           Jumpie.GameObject           (Box (Box), BoxType (..),
                                               playerWalkSince)
 import           Jumpie.GameState            (GameState, gsObjects)
 import           Jumpie.Geometry.LineSegment (LineSegment)
-import           Jumpie.Geometry.Point       (Point2 (..), vmult)
-import           Jumpie.Geometry.Rect        (dimensions, rectTopLeft)
+import           Jumpie.Geometry.Point       (Point2)
+import           Jumpie.Geometry.Rect        (rectTopLeft)
 import           Jumpie.Types                (LineSegmentInt, PointInt,
                                               PointReal)
-import           Prelude                     (Double, Fractional, Integral, abs,
-                                              div, error, error, floor,
-                                              fromIntegral, mod, sin, undefined,
-                                              (*), (+), (-), (/))
-import           Text.Show                   (Show, show)
 import Control.Lens((^.))
 import Wrench.Color
 import Wrench.ImageData
 import Wrench.Time
 import Wrench.Rectangle
 import ClassyPrelude
+import Linear.Vector((^*))
+import Linear.V2
 
 type RGBColor = (Word8,Word8,Word8)
 
 data RenderPositionMode = RenderPositionCenter | RenderPositionTopLeft deriving(Show,Eq)
 
 data RenderCommand = FillScreen Color |
-                     RenderSprite String PointInt RenderPositionMode |
-                     RenderBackground String |
+                     RenderSprite Text PointInt RenderPositionMode |
+                     RenderBackground Text |
                      RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
 
 -- Mutumorphismus zwischen optimizePlats und compressPlatforms
@@ -65,7 +62,7 @@ compressPlatforms ns (a:as) =
 compressPlatforms _ [] =
   error "Invalid platform configuration, doesn't end in \"platforml\" element, ends in nothing"
 compressPlatform :: [RenderCommand] -> RenderCommand
-compressPlatform ((RenderSprite _ pos mode):ns) = RenderSprite ("platform" ++ (show (length ns - 1))) pos mode
+compressPlatform ((RenderSprite _ pos mode):ns) = RenderSprite ("platform" ++ (pack (show (length ns - 1)))) pos mode
 compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
 commandizeGameState :: GameState -> GameDataM p [RenderCommand]
@@ -88,13 +85,13 @@ commandizeBox (Box p t) = return [
 commandizeStar :: Star -> GameDataM p [RenderCommand]
 commandizeStar (Star pos t) = do
   currentTicks <- gets gdCurrentTicks
-  let wiggledPos = pos + (Point2 0 (gcStarWiggleHeight * (sin (toSeconds (currentTicks `tickDelta` t)*gcStarWiggleSpeed))))
+  let wiggledPos = pos + (V2 0 (gcStarWiggleHeight * (sin (toSeconds (currentTicks `tickDelta` t)*gcStarWiggleSpeed))))
   return [RenderSprite "star" (floor <$> wiggledPos) RenderPositionCenter]
 
 commandizeLine :: SensorLine -> GameDataM p [RenderCommand]
 commandizeLine (SensorLine s) = return $ [RenderLine (255,0,0) (toIntLine s)]
 
-boxTypeToSuffix :: BoxType -> String
+boxTypeToSuffix :: IsString s => BoxType -> s
 boxTypeToSuffix BoxMiddle = "m"
 boxTypeToSuffix BoxLeft = "l"
 boxTypeToSuffix BoxRight = "r"
@@ -104,17 +101,18 @@ commandizePlayer :: Player -> GameDataM p [RenderCommand]
 commandizePlayer p = do
   ticks <- gdCurrentTicks <$> get
   gd <- get
-  let   pp = (playerPosition p) - ((vmult 0.5) $ toPointReal $ (playerRect ^. rectangleDimensions))
+  let   pp = (playerPosition p) - ((^* 0.5) $ (playerRect ^. rectangleDimensions))
+        playerImage :: Text
         playerImage = if playerMode p == Air
                       then ("player_fly_" ++ playerDirection)
                       else if playerStands || isNothing (playerWalkSince p)
                            then "player_stand"
                            else playerImageWalk (fromJust (playerWalkSince p))
-        playerStands = abs ((pX . playerVelocity) p) <= 0.01
+        playerStands = abs (((^. _x) . playerVelocity) p) <= 0.01
         playerImageWalk walkSince = animFrames playerWalkAnim !! (playerImageWalkIndex walkSince)
         playerImageWalkIndex walkSince = (floor (toSeconds (ticks `tickDelta` walkSince) / (fromIntegral (animFrameSwitch playerWalkAnim) / 1000.0))) `mod` (length (animFrames playerWalkAnim))
         playerWalkAnim = (gdAnims gd) ! ("player_walk_" ++ playerDirection)
-        playerDirection = if (pX . playerVelocity) p <= 0.0 then "left" else "right"
+        playerDirection = if ((^. _x) . playerVelocity) p <= 0.0 then "left" else "right"
         (_,playerRect) = gdSurfaces gd ! playerImage
   return $ [RenderSprite playerImage (floor <$> pp) RenderPositionTopLeft]
 

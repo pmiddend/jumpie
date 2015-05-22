@@ -33,7 +33,8 @@ executable jumpie
                        bifunctors,
                        wrench,
                        classy-prelude,
-                       lens
+                       lens,
+                       linear
   ghc-options: -Wall
   extensions: NoImplicitPrelude
 

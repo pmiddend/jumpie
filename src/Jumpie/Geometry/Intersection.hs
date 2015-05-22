@@ -9,20 +9,18 @@ module Jumpie.Geometry.Intersection(
   parabolaPointIntersects
   ) where
 
-import Control.Applicative((<$>),(<*>),pure)
 import Jumpie.Maybe(headOrNothing)
 import Jumpie.Tuple(between)
-import Data.Bool((&&),(||),not,otherwise,Bool)
 import Data.Composition((.:))
-import Data.Function((.),($))
-import Data.List(or,map,zip,zipWith,and,or)
-import Data.Maybe(Maybe(..),isJust)
-import Data.Ord((<=),(>=),(>),(<),Ord)
 import Jumpie.Geometry.LineSegment(LineSegment(..),pointList)
 import Jumpie.Geometry.Parabola(Parabola,paraZenith,paraBounds)
-import Jumpie.Geometry.Point(Point2,vmult,cross,dot,pointToList,pY,pX)
+import Jumpie.Geometry.Point
 import Jumpie.Geometry.Rect(Rect,inside,lineSegments,rectTopLeft,rectBottomRight)
-import Prelude(Num,(+),(*),(-),(/),negate,abs,signum,fromInteger,Double,Fractional,Floating)
+import ClassyPrelude
+import Linear.Vector((*^))
+import Linear.Metric(dot)
+import Linear.V2(_x,_y)
+import Control.Lens((^.))
 
 lineSegmentIntersects :: (Num a,Fractional a,Ord a) => a -> LineSegment (Point2 a) -> LineSegment (Point2 a) -> Bool
 lineSegmentIntersects delta l1 l2 = isJust $ lineSegmentIntersection delta l1 l2
@@ -31,16 +29,16 @@ lineSegmentIntersects delta l1 l2 = isJust $ lineSegmentIntersection delta l1 l2
 -- Vielleicht kann man das in 'ne Typklasse auslagern?
 lineSegmentIntersection :: (Num a,Fractional a,Ord a) => a -> LineSegment (Point2 a) -> LineSegment (Point2 a) -> Maybe (Point2 a)
 lineSegmentIntersection delta (LineSegment p to1) (LineSegment q to2)
-  | collinear && overlapping = Just (p + (tnom/denom) `vmult` r)
+  | collinear && overlapping = Just (p + (tnom/denom) *^ r)
   | collinear && not overlapping = Nothing
   | abs denom <= delta && abs unom > delta = Nothing
-  | abs denom > delta && isNormalized (tnom / denom) && isNormalized (unom / denom) = Just (p + (tnom/denom) `vmult` r)
+  | abs denom > delta && isNormalized (tnom / denom) && isNormalized (unom / denom) = Just (p + (tnom/denom) *^ r)
   | otherwise = Nothing
   where r = to1 - p
         s = to2 - q
-        denom = r `cross` s
-        tnom = (q - p) `cross` s
-        unom = (q - p) `cross` r
+        denom = r `cross2` s
+        tnom = (q - p) `cross2` s
+        unom = (q - p) `cross2` r
         isNormalized z = z >= 0 && z <= 1
         collinear = abs denom <= delta && abs unom <= delta
         overlapping = (0 <= ((q - p) `dot` r) && ((q - p) `dot` r) <= (r `dot` r)) || (0 <= (p - q) `dot` s && (p - q) `dot` s <= s `dot` s)
@@ -66,4 +64,4 @@ lineSegmentInsideRect :: Ord a => LineSegment (Point2 a) -> Rect (Point2 a) -> B
 lineSegmentInsideRect line r = and (map (pointInsideRect r) (pointList line))
 
 parabolaPointIntersects :: (Ord a,Floating a) => Parabola a -> Point2 a -> Bool
-parabolaPointIntersects para p = pY p < paraZenith para && pX p `between` (paraBounds para (pY p))
+parabolaPointIntersects para p = (p ^. _y) < paraZenith para && (p ^. _x) `between` (paraBounds para (p ^. _y))

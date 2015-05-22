@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 {-
@@ -10,9 +11,6 @@ import           Data.Function              (($), (.))
 import           Data.List                  (any, concatMap, lookup, map, (++))
 import           Data.Maybe                 (fromMaybe)
 import           Jumpie.AudioData           (readAllSoundFiles)
-import           Jumpie.Commandize          (RenderCommand (RenderSprite),
-                                             RenderPositionMode (..),
-                                             commandizeGameState, optimizePlats)
 import           Jumpie.Game                (processGameObjects, testGameOver)
 import           Jumpie.GameData            (GameData (..), GameDataM,
                                              gdCurrentTicks, gdKeydowns,
@@ -32,7 +30,10 @@ import           System.IO                  (IO, putStrLn)
 import           Jumpie.GameObject          (GameObject (..), isStar)
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
-import           Jumpie.Render              (render, renderAll, renderFinish)
+import           Jumpie.Render              (render, renderAll)
+import           Jumpie.Commandize          (RenderCommand (RenderSprite),
+                                             RenderPositionMode (..),
+                                             commandizeGameState, optimizePlats)
 import           Jumpie.List                (countBy)
 import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
@@ -46,12 +47,13 @@ import qualified Wrench.Keysym as KS
 import Wrench.Engine (withPlatform)
 import Wrench.Event
 import Wrench.ImageData (readMediaFiles)
-import Wrench.Platform
+import Wrench.Platform hiding(renderFinish,pollEvents)
 import ClassyPrelude
+import Linear.V2
 
-gameoverMainLoop :: GameState -> GameDataM ()
+gameoverMainLoop :: Platform p => GameState -> GameDataM p ()
 gameoverMainLoop gameState = do
-    events <- liftIO pollEvents
+    events <- pollEvents
     updateKeydowns events
     unless (outerGameOver events) $
         do renderAll =<<
@@ -60,16 +62,16 @@ gameoverMainLoop gameState = do
            render $
                RenderSprite
                    "gameover"
-                   (Point2
+                   (V2
                         (screenWidth `div` 2)
                         (screenHeight `div` 2))
                    RenderPositionCenter
            renderFinish
            gameoverMainLoop gameState
 
-stageMainLoop :: GameState -> GameDataM GameState
+stageMainLoop :: Platform p => GameState -> GameDataM p GameState
 stageMainLoop gameState = do
-    events <- liftIO pollEvents
+    events <- pollEvents
     updateTicks
     updateKeydowns events
     if (outerGameOver events || gsGameOver gameState || gsStarsCollected
@@ -119,10 +121,10 @@ outerGameOver events = any outerGameOver' events
 main :: IO ()
 main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
   \platform -> do
-    (images, anims) <- readMediaFiles platform
+    (images, anims) <- readMediaFiles (loadImage platform) mediaDir
     ticks <- getTicks
     g <- getStdGen
-    let gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = [] }
+    let gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty }
     let initialGameState = GameState { gsObjects = (evalRand generateGame g), gsGameOver = False, gsStarsCollected = 0, gsStarsTotal = 10 }
     (lastGameState, lastGameData) <- runGame g gameData $
                                        stageMainLoop initialGameState

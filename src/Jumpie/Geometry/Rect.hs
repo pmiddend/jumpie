@@ -13,13 +13,16 @@ module Jumpie.Geometry.Rect(
   rectToTuple
   ) where
 
-import Jumpie.Geometry.Point(Point2(Point2),pX,pY,pointToList,vmult)
+import Jumpie.Geometry.Point
 import Jumpie.Geometry.LineSegment(LineSegment(LineSegment))
 import Data.Ord(Ord,(>=),(<=))
 import Prelude((-),Num,Fractional,(+))
 import Data.Functor(Functor,fmap)
 import Data.Bool(Bool,(&&))
 import Text.Show(Show)
+import Linear.V2(V2(..),_x,_y)
+import Linear.Vector((*^))
+import Control.Lens((^.))
 
 data Rect a = Rect { rectTopLeft :: a, rectBottomRight :: a } deriving(Show)
 
@@ -31,26 +34,26 @@ inside (Rect tlsmall brsmall) (Rect tlbig brbig) = (pointToList tlsmall >= point
 
 lineSegments :: Rect (Point2 a) -> [LineSegment (Point2 a)]
 lineSegments (Rect tl br) = [
-  LineSegment (Point2 _left _top) (Point2 _right _top),
-  LineSegment (Point2 _right _top) (Point2 _right _bottom),
-  LineSegment (Point2 _right _bottom) (Point2 _left _bottom),
-  LineSegment (Point2 _left _bottom) (Point2 _left _top)]
-  where _left = pX tl
-        _right = pX br
-        _top = pY tl
-        _bottom = pY br
+  LineSegment (V2  _left _top) (V2  _right _top),
+  LineSegment (V2  _right _top) (V2  _right _bottom),
+  LineSegment (V2  _right _bottom) (V2  _left _bottom),
+  LineSegment (V2  _left _bottom) (V2  _left _top)]
+  where _left = tl ^. _x
+        _right = br ^. _x
+        _top = tl ^. _y
+        _bottom = br ^. _y
 
 dimensions :: Num a => Rect (Point2 a) -> Point2 a
 dimensions (Rect tl br) = br - tl
 
 center :: Fractional a => Rect (Point2 a) -> Point2 a
-center r@(Rect lt _) = lt + 0.5 `vmult` dimensions r
+center r@(Rect lt _) = lt + 0.5 *^ dimensions r
 
 top, left, right, bottom :: Rect (Point2 a) -> a
-top (Rect (Point2 _ a) _) = a
-left (Rect (Point2 a _) _) = a
-bottom (Rect _ (Point2 _ a)) = a
-right (Rect _ (Point2 a _)) = a
+top (Rect (V2  _ a) _) = a
+left (Rect (V2  a _) _) = a
+bottom (Rect _ (V2  _ a)) = a
+right (Rect _ (V2  a _)) = a
 
 rectToTuple :: Rect (Point2 a) -> (Point2 a,Point2 a)
 rectToTuple (Rect a b) = (a,b)

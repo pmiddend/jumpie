@@ -14,7 +14,6 @@ import           Jumpie.GameObject      (Box (Box), BoxType (..),
                                          boxPosition, maybeBox, playerMode,
                                          playerPosition, playerVelocity,
                                          playerWalkSince)
-import           Jumpie.Geometry.Point  (Point2 (Point2))
 import           Jumpie.Geometry.Rect   (Rect (Rect), rectTopLeft)
 import           Jumpie.Random          (randomElemM)
 import           Jumpie.Types           (PointInt, PointReal, RectInt)
@@ -31,6 +30,7 @@ import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
                                          pTiles, randomPlatform, validPlatforms)
 import           Prelude                (div, fromIntegral, (*), (+), (-), (/))
 import Wrench.Time
+import Linear.V2
 
   {-
 initialPlayer :: Player
@@ -56,12 +56,12 @@ platsToPoints :: [Platform] -> [PointInt]
 platsToPoints ps = concatMap pTiles ps
 
 tilesRect :: RectInt
-tilesRect = (Rect (Point2 1 1) (Point2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1)))
+tilesRect = (Rect (V2 1 1) (V2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1)))
 
 platToBoxes :: [PointInt] -> Platform -> [Box]
-platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
+platToBoxes plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
   where toBox x = Box (bpos x) (btype x)
-        bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (Point2 x y) (Point2 (x+1) (y+1)))
+        bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (V2 x y) (V2 (x+1) (y+1)))
         btype x = if hasLeft && hasRight
                   then BoxMiddle
                   else
@@ -71,18 +71,18 @@ platToBoxes plats (Platform (Point2 l y) (Point2 r _)) = map toBox [l..r]
                       if hasRight
                       then BoxRight
                       else BoxSingleton
-          where hasLeft = (Point2 (x-1) y) `elem` plats
-                hasRight = (Point2 (x+1) y) `elem` plats
+          where hasLeft = (V2 (x-1) y) `elem` plats
+                hasRight = (V2 (x+1) y) `elem` plats
 
 randomAbovePlatPosition :: MonadRandom m => [GameObject] -> m PointReal
 randomAbovePlatPosition xs = do
   randomBox <- randomElemM $ concatMap (maybeToList . maybeBox) xs
-  return . (+ (Point2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition $ randomBox
+  return . (+ (V2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition $ randomBox
 
 randomStar :: MonadRandom m => TimeTicks -> [GameObject] -> m Star
 randomStar ticks xs = do
   p <- randomAbovePlatPosition xs
-  return $ Star (p - (Point2 0 (fromIntegral (gcTileSize `div` 2)))) ticks
+  return $ Star (p - (V2 0 (fromIntegral (gcTileSize `div` 2)))) ticks
 
 generateGame :: MonadRandom m => m [GameObject]
 generateGame = do
@@ -91,9 +91,9 @@ generateGame = do
       boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
   rawPlayerPos <- randomAbovePlatPosition boxes
   let player = Player {
-        playerPosition = rawPlayerPos + (Point2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize))),
+        playerPosition = rawPlayerPos + (V2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize))),
         playerMode = Air,
-        playerVelocity = Point2 0.0 0.0,
+        playerVelocity = V2 0.0 0.0,
         playerWalkSince = Nothing
       }
   return $ (ObjectPlayer $ player) : boxes

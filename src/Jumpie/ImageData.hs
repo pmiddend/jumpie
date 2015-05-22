@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TupleSections         #-}
 module Jumpie.ImageData(
+  {-
   ImageId,
   ImageMap,
   AnimMap,
@@ -10,8 +11,10 @@ module Jumpie.ImageData(
   animFrames,
   SurfaceMap,
   SurfaceData
+-}
   ) where
 
+{-
 import           Control.Applicative    ((*>), (<$>), (<*), (<*>))
 import           Control.Category       ((>>>))
 import           Control.Monad          (return, (>>=))
@@ -122,3 +125,5 @@ imageDataLineImageC = (,) <$> (many1 (noneOf "=\n")) <*> (char '=' *> rect2IntC)
 
 imageDataLineAnimC :: Stream s m Char => ParsecT s u m (AnimId,Animation)
 imageDataLineAnimC = (,) <$> (many1 (noneOf "=\n")) <*> (Animation <$> (char '=' *> int <* char '|') <*> (sepEndBy1 (many1 (noneOf ",\n")) (char ',')))
+
+-}

@@ -1,16 +1,16 @@
-module Jumpie.Geometry.Point(
-  Point2(Point2),
-  pX,
-  pY,
-  cross,
-  dot,
-  vmult,
-  pointFromTuple,
-  pointToTuple,
-  pointToList,
-  euclideanDistance
-  ) where
+module Jumpie.Geometry.Point where
 
+import Linear.V2
+import ClassyPrelude
+
+type Point2 a = V2 a
+
+pointToList :: Point2 a -> [a]
+pointToList (V2 a b) = [a,b]
+
+cross2 :: Num a => Point2 a -> Point2 a -> a
+cross2 (V2 x1 y1) (V2 x2 y2) = x1 * y2 - y1 * x2
+{-
 import Prelude(Num,(+),(*),(-),negate,abs,signum,fromInteger,Floating,sqrt)
 import Data.Functor(fmap,Functor)
 import Data.Function(($))
@@ -61,3 +61,5 @@ pointToList (Point2 a b) = [a,b]
 euclideanDistance :: Floating a => Point2 a -> Point2 a -> a
 euclideanDistance a b = sqrt $ dot diff diff
   where diff = a-b
+
+-}

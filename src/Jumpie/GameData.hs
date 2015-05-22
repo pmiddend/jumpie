@@ -5,6 +5,11 @@ module Jumpie.GameData(
   , updateTicks
   , GameDataM
   , runGame
+  , pollEvents
+  , renderBegin
+  , renderFinish
+  , renderSprites
+  , renderClear
   ) where
 
 import qualified Data.Set as S
@@ -16,15 +21,16 @@ import           Jumpie.GameConfig          (gcTimeMultiplier)
 import           Control.Monad.Random       (RandT, evalRandT)
 import           System.Random              (StdGen)
 import Wrench.ImageData(SurfaceMap,AnimMap)
-import Wrench.Platform
+import qualified Wrench.Platform as P
 import Wrench.Time
+import Wrench.Color
 import Wrench.Event
 import Wrench.KeyMovement
 import           Jumpie.Types               (Keydowns)
 import ClassyPrelude
 
 data GameData p = GameData {
-    gdSurfaces     :: SurfaceMap (PlatformImage p)
+    gdSurfaces     :: SurfaceMap (P.PlatformImage p)
   , gdAnims        :: AnimMap
   , gdPlatform     :: p
   , gdCurrentTicks :: !TimeTicks
@@ -63,6 +69,31 @@ updateKeydowns events = do
   oldKeydowns <- gets gdKeydowns
   s <- get
   put s { gdKeydowns = processKeydowns oldKeydowns events }
+
+pollEvents :: P.Platform p => GameDataM p [Event]
+pollEvents = do
+  p <- gets gdPlatform
+  liftIO $ P.pollEvents p
+
+renderBegin :: P.Platform p => GameDataM p ()
+renderBegin = do
+  p <- gets gdPlatform
+  liftIO $ P.renderBegin p
+
+renderClear :: P.Platform p => Color -> GameDataM p ()
+renderClear color = do
+  p <- gets gdPlatform
+  liftIO $ P.renderClear p color
+
+renderFinish :: P.Platform p => GameDataM p ()
+renderFinish = do
+  p <- gets gdPlatform
+  liftIO $ P.renderFinish p
+
+renderSprites :: P.Platform p => [P.SpriteInstance (P.PlatformImage p)] -> GameDataM p ()
+renderSprites ss = do
+  p <- gets gdPlatform
+  liftIO $ P.renderSprites p ss
 
 runGame :: StdGen -> GameData p -> GameDataM p a -> IO (a,GameData p)
 runGame r gameData game = runStateT (evalRandT game r) gameData
