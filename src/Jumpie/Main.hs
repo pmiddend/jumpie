@@ -47,7 +47,7 @@ import qualified Wrench.Keysym as KS
 import Wrench.Engine (withPlatform)
 import Wrench.Event
 import Wrench.ImageData (readMediaFiles)
-import Wrench.Platform hiding(renderFinish,pollEvents)
+import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
 import Linear.V2
 
@@ -56,7 +56,9 @@ gameoverMainLoop gameState = do
     events <- pollEvents
     updateKeydowns events
     unless (outerGameOver events) $
-        do renderAll =<<
+        do 
+           renderBegin
+           renderAll =<<
                (return . optimizePlats) =<<
                commandizeGameState gameState
            render $
