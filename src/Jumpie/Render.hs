@@ -33,8 +33,6 @@ import           Control.Lens.TH           (makeLenses)
 import Wrench.Rectangle
 import Wrench.Platform(SpriteInstance(..),Platform)
 
-eye3 :: Num a => M33 a
-eye3 = V3 (V3 1 0 0) (V3 0 1 0) (V3 0 0 1)
 {-
 setRenderDrawColor :: Color -> GameDataM ()
 setRenderDrawColor c = return (){-do
@@ -94,15 +92,14 @@ render ob = case ob of
         rot = 0
     renderSprites [SpriteInstance image srcRect destRect rot]
   --RenderLine color lineSegment -> surfaceBresenham (gdScreen gd) color lineSegment
-  RenderSprite identifier pos mode -> do
+  RenderSprite identifier pos' mode -> do
     surfaces <- gets gdSurfaces
-    let (image,srcRect) = findSurfaceUnsafe surfaces identifier
-        m = eye3
-        origin = (m !* V3 0 0 1) ^. toV2
+    let (image,srcRect') = findSurfaceUnsafe surfaces identifier
+        srcRectDim = srcRect' ^. rectangleDimensions
         pos = case mode of
-            RenderPositionCenter -> origin - (srcRect ^. rectangleDimensions ^. dividing 2)
-            RenderPositionTopLeft -> origin
+            RenderPositionCenter -> (fromIntegral <$> pos') - ((/2) <$> srcRectDim)
+            RenderPositionTopLeft -> fromIntegral <$> pos'
         rot = 0
-        destRect = rectangleFromPoints pos (pos + (srcRect ^. rectangleDimensions))
-    renderSprites [SpriteInstance image srcRect destRect rot]
+        destRect = rectangleFromPoints pos (pos + srcRectDim)
+    renderSprites [SpriteInstance image srcRect' destRect rot]
 
