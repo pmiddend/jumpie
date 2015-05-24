@@ -1,9 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Jumpie.Commandize(
-  RenderCommand(..),
   RenderPositionMode(..),
-  commandizeGameState,
-  optimizePlats
+  commandizeGameState
   ) where
 
 import Data.List((!!))
@@ -12,23 +10,21 @@ import           Data.Maybe                  (fromJust)
 --import           Debug.Trace                 (trace)
 import           Control.Monad.State.Strict  (get, gets)
 
-import           Jumpie.GameConfig           (backgroundColor,
-                                              gcStarWiggleHeight,
+import           Jumpie.GameConfig           (gcStarWiggleHeight,
                                               gcStarWiggleSpeed,screenWidth,screenHeight)
-import           Jumpie.GameData             (GameData, GameDataM, gdAnims,
+import           Jumpie.GameData             (GameDataM, gdAnims,
                                               gdCurrentTicks, gdSurfaces)
 import           Jumpie.GameObject           (Box (Box), BoxType (..),
                                               GameObject (..), Player,
                                               PlayerMode (..),
-                                              SensorLine (SensorLine),line,
+                                              SensorLine (SensorLine),
                                               Star (..), playerMode,
                                               playerPosition, playerVelocity,
                                               playerWalkSince)
 import           Jumpie.GameState            (GameState, gsObjects)
-import           Jumpie.Geometry.LineSegment (LineSegment,lineSegmentFrom,lineSegmentTo)
+import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
 import           Jumpie.Geometry.Rect        (rectTopLeft)
-import           Jumpie.Types                (LineSegmentInt, PointInt,
-                                              PointReal)
+import           Jumpie.Types                (LineSegmentInt, PointInt)
 import Control.Lens((^.))
 import Wrench.Color
 import Wrench.ImageData
@@ -46,22 +42,6 @@ data RenderCommand = FillScreen Color |
                      RenderSprite Text PointInt RenderPositionMode |
                      RenderBackground Text |
                      RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
-
--- Mutumorphismus zwischen optimizePlats und compressPlatforms
-optimizePlats :: [RenderCommand] -> [RenderCommand]
-optimizePlats ((p@(RenderSprite "platformr" _ _)):xs) = compressPlatforms [p] xs
-optimizePlats (x:xs) = x:(optimizePlats xs)
-optimizePlats [] = []
-compressPlatforms :: [RenderCommand] -> [RenderCommand] -> [RenderCommand]
-compressPlatforms ns (q@(RenderSprite "platformm" _ _):ys) = compressPlatforms (ns ++ [q]) ys
-compressPlatforms ns (q@(RenderSprite "platforml" _ _):ys) = compressPlatform (ns ++ [q]) : optimizePlats ys
-compressPlatforms ns (a:as) =
-  error $ "Invalid platform configuration, ends in \"" ++ show a ++ "\", next: " ++ show as ++ ", previous: " ++ show ns
-compressPlatforms _ [] =
-  error "Invalid platform configuration, doesn't end in \"platforml\" element, ends in nothing"
-compressPlatform :: [RenderCommand] -> RenderCommand
-compressPlatform ((RenderSprite _ pos mode):ns) = RenderSprite ("platform" ++ (pack (show (length ns - 1)))) pos mode
-compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
 commandizeGameState :: GameState -> GameDataM p Picture
 commandizeGameState gs = do

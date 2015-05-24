@@ -1,12 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Jumpie.GameObject          (GameObject (..), isStar)
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
-import           Jumpie.Commandize          (RenderCommand (RenderSprite),
-                                             RenderPositionMode (..),
-                                             commandizeGameState, optimizePlats)
+import           Jumpie.Commandize          (commandizeGameState)
 import           Jumpie.List                (countBy)
 import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
@@ -22,7 +19,6 @@ import Wrench.Event
 import Wrench.ImageData (readMediaFiles)
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
-import Linear.V2
 
 gameoverMainLoop :: Platform p => GameState -> GameDataM p ()
 gameoverMainLoop gameState = do
@@ -31,20 +27,6 @@ gameoverMainLoop gameState = do
     unless (outerGameOver events) $
         do 
           render =<< (commandizeGameState gameState)
-          {-
-           renderBegin
-           renderAll =<<
-               (return . optimizePlats) =<<
-               commandizeGameState gameState
-           render $
-               RenderSprite
-                   "gameover"
-                   (V2
-                        (screenWidth `div` 2)
-                        (screenHeight `div` 2))
-                   RenderPositionCenter
-           renderFinish
-          -}
           gameoverMainLoop gameState
 
 stageMainLoop :: Platform p => GameState -> GameDataM p GameState
@@ -61,27 +43,14 @@ stageMainLoop gameState = do
             let incomingActions = concatMap kdToAction (gdKeydowns gameData)
             (newObjects,actions) <-
                 processGameObjects gameState incomingActions
-            let currentStars = countBy isStar newObjects
-            remainingStars <-
-                replicateM
-                    (gcStars - currentStars)
-                    (randomStar
-                         (gdCurrentTicks gameData)
-                         newObjects)
             let newState = gameState
                     { gsGameOver = testGameOver gameState
-                    , gsObjects = newObjects ++
-                      (map ObjectStar remainingStars)
+                    , gsObjects = newObjects{- ++
+                      (map ObjectStar remainingStars)-}
                     , gsStarsCollected = gsStarsCollected gameState +
                       (countBy isStarCollected actions)
                     }
             render =<< (commandizeGameState gameState)
-    {-
-            renderAll =<<
-                (return . optimizePlats) =<<
-                commandizeGameState gameState
-            renderFinish
--}
             stageMainLoop newState
 
 kdToAction :: KS.Keysym -> [IncomingAction]
