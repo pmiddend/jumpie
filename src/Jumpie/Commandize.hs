@@ -24,9 +24,7 @@ import           Jumpie.GameObject           (Box (Box), BoxType (..),
 import           Jumpie.GameState            (GameState, gsObjects)
 import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
 import           Jumpie.Geometry.Rect        (rectTopLeft)
-import           Jumpie.Types                (LineSegmentInt, PointInt)
 import Control.Lens((^.))
-import Wrench.Color
 import Wrench.ImageData
 import Wrench.Time
 import Wrench.Rectangle
@@ -35,13 +33,6 @@ import ClassyPrelude
 import Linear.Vector((^*))
 import Linear.V2
 import Wrench.RenderPositionMode
-
-type RGBColor = (Word8,Word8,Word8)
-
-data RenderCommand = FillScreen Color |
-                     RenderSprite Text PointInt RenderPositionMode |
-                     RenderBackground Text |
-                     RenderLine RGBColor LineSegmentInt deriving(Show,Eq)
 
 commandizeGameState :: GameState -> GameDataM p Picture
 commandizeGameState gs = do
