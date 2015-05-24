@@ -1,36 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-{-
-import           Control.Monad              (replicateM, return, unless, (=<<))
-import           Control.Monad.IO.Class     (liftIO)
-import           Control.Monad.State.Strict (get)
-import           Data.Bool                  (Bool (..), (||))
-import           Data.Eq                    ((==))
-import           Data.Function              (($), (.))
-import           Data.List                  (any, concatMap, lookup, map, (++))
-import           Data.Maybe                 (fromMaybe)
-import           Jumpie.AudioData           (readAllSoundFiles)
-import           Jumpie.Game                (processGameObjects, testGameOver)
-import           Jumpie.GameData            (GameData (..), GameDataM,
-                                             gdCurrentTicks, gdKeydowns,
-                                             runGame, updateKeydowns,
-                                             updateTicks)
-import           Jumpie.GameState           (GameState (..), gsGameOver,
-                                             gsObjects)
-import           Jumpie.Geometry.Point      (Point2 (Point2))
-import           Jumpie.ImageData           (readAllDescFiles)
-import           Jumpie.Types               (IncomingAction (..),
-                                             isStarCollected)
-import           Prelude                    (Double, Fractional, Integral, abs,
-                                             div, error, floor, fromIntegral,
-                                             mod, undefined, (*), (+), (-), (/))
-import           System.IO                  (IO, putStrLn)
--}
 import           Jumpie.GameObject          (GameObject (..), isStar)
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
-import           Jumpie.Render              (render, renderAll)
 import           Jumpie.Commandize          (RenderCommand (RenderSprite),
                                              RenderPositionMode (..),
                                              commandizeGameState, optimizePlats)
@@ -57,6 +30,8 @@ gameoverMainLoop gameState = do
     updateKeydowns events
     unless (outerGameOver events) $
         do 
+          render =<< (commandizeGameState gameState)
+          {-
            renderBegin
            renderAll =<<
                (return . optimizePlats) =<<
@@ -69,7 +44,8 @@ gameoverMainLoop gameState = do
                         (screenHeight `div` 2))
                    RenderPositionCenter
            renderFinish
-           gameoverMainLoop gameState
+          -}
+          gameoverMainLoop gameState
 
 stageMainLoop :: Platform p => GameState -> GameDataM p GameState
 stageMainLoop gameState = do
@@ -99,10 +75,13 @@ stageMainLoop gameState = do
                     , gsStarsCollected = gsStarsCollected gameState +
                       (countBy isStarCollected actions)
                     }
+            render =<< (commandizeGameState gameState)
+    {-
             renderAll =<<
                 (return . optimizePlats) =<<
                 commandizeGameState gameState
             renderFinish
+-}
             stageMainLoop newState
 
 kdToAction :: KS.Keysym -> [IncomingAction]
@@ -126,7 +105,8 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     (images, anims) <- readMediaFiles (loadImage platform) mediaDir
     ticks <- getTicks
     g <- getStdGen
-    let gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty }
+    font <- loadFont platform (mediaDir <> "/stdfont.ttf") 15
+    let gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
     let initialGameState = GameState { gsObjects = (evalRand generateGame g), gsGameOver = False, gsStarsCollected = 0, gsStarsTotal = 10 }
     (lastGameState, lastGameData) <- runGame g gameData $
                                        stageMainLoop initialGameState

@@ -9,25 +9,23 @@ module Jumpie.Commandize(
 import Data.List((!!))
 import           Data.Map.Strict             ((!))
 import           Data.Maybe                  (fromJust)
-import           Jumpie.Monad                (concatMapM)
 --import           Debug.Trace                 (trace)
 import           Control.Monad.State.Strict  (get, gets)
 
 import           Jumpie.GameConfig           (backgroundColor,
                                               gcStarWiggleHeight,
-                                              gcStarWiggleSpeed)
+                                              gcStarWiggleSpeed,screenWidth,screenHeight)
 import           Jumpie.GameData             (GameData, GameDataM, gdAnims,
                                               gdCurrentTicks, gdSurfaces)
 import           Jumpie.GameObject           (Box (Box), BoxType (..),
                                               GameObject (..), Player,
                                               PlayerMode (..),
-                                              SensorLine (SensorLine),
+                                              SensorLine (SensorLine),line,
                                               Star (..), playerMode,
                                               playerPosition, playerVelocity,
                                               playerWalkSince)
 import           Jumpie.GameState            (GameState, gsObjects)
-import           Jumpie.Geometry.LineSegment (LineSegment)
-import           Jumpie.Geometry.Point       (Point2)
+import           Jumpie.Geometry.LineSegment (LineSegment,lineSegmentFrom,lineSegmentTo)
 import           Jumpie.Geometry.Rect        (rectTopLeft)
 import           Jumpie.Types                (LineSegmentInt, PointInt,
                                               PointReal)
@@ -36,13 +34,13 @@ import Wrench.Color
 import Wrench.ImageData
 import Wrench.Time
 import Wrench.Rectangle
+import Wrench.Picture
 import ClassyPrelude
 import Linear.Vector((^*))
 import Linear.V2
+import Wrench.RenderPositionMode
 
 type RGBColor = (Word8,Word8,Word8)
-
-data RenderPositionMode = RenderPositionCenter | RenderPositionTopLeft deriving(Show,Eq)
 
 data RenderCommand = FillScreen Color |
                      RenderSprite Text PointInt RenderPositionMode |
@@ -65,31 +63,29 @@ compressPlatform :: [RenderCommand] -> RenderCommand
 compressPlatform ((RenderSprite _ pos mode):ns) = RenderSprite ("platform" ++ (pack (show (length ns - 1)))) pos mode
 compressPlatform _ = error "compressPlatform given something other than RenderSprite"
 
-commandizeGameState :: GameState -> GameDataM p [RenderCommand]
+commandizeGameState :: GameState -> GameDataM p Picture
 commandizeGameState gs = do
-  commandizedObjects <- concatMapM commandizeObject (gsObjects gs)
-  return $ FillScreen backgroundColor : RenderBackground "background" : commandizedObjects
+  commandizedObjects <- mapM commandizeObject (gsObjects gs)
+  return (pictures ([pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))] <> commandizedObjects))
 
-commandizeObject :: GameObject -> GameDataM p [RenderCommand]
+commandizeObject :: GameObject -> GameDataM p Picture
 commandizeObject ob = case ob of
   ObjectPlayer p -> commandizePlayer p
   ObjectSensorLine s -> commandizeLine s
   ObjectBox b -> commandizeBox b
   ObjectStar s -> commandizeStar s
 
-commandizeBox :: Box -> GameDataM p [RenderCommand]
-commandizeBox (Box p t) = return [
-  RenderSprite ("platform" ++ boxTypeToSuffix t) (floor <$> (rectTopLeft p)) RenderPositionTopLeft
-  ]
+commandizeBox :: Box -> GameDataM p Picture
+commandizeBox (Box p t) = return ((rectTopLeft p) `pictureTranslated` (pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t)))
 
-commandizeStar :: Star -> GameDataM p [RenderCommand]
+commandizeStar :: Star -> GameDataM p Picture
 commandizeStar (Star pos t) = do
   currentTicks <- gets gdCurrentTicks
   let wiggledPos = pos + (V2 0 (gcStarWiggleHeight * (sin (toSeconds (currentTicks `tickDelta` t)*gcStarWiggleSpeed))))
-  return [RenderSprite "star" (floor <$> wiggledPos) RenderPositionCenter]
+  return (wiggledPos `pictureTranslated` (pictureSpriteCentered "star"))
 
-commandizeLine :: SensorLine -> GameDataM p [RenderCommand]
-commandizeLine (SensorLine s) = return $ [RenderLine (255,0,0) (toIntLine s)]
+commandizeLine :: SensorLine -> GameDataM p Picture
+commandizeLine (SensorLine s) = return (pictureLine (lineSegmentFrom s) (lineSegmentTo s))
 
 boxTypeToSuffix :: IsString s => BoxType -> s
 boxTypeToSuffix BoxMiddle = "m"
@@ -97,7 +93,7 @@ boxTypeToSuffix BoxLeft = "l"
 boxTypeToSuffix BoxRight = "r"
 boxTypeToSuffix BoxSingleton = "s"
 
-commandizePlayer :: Player -> GameDataM p [RenderCommand]
+commandizePlayer :: Player -> GameDataM p Picture
 commandizePlayer p = do
   ticks <- gdCurrentTicks <$> get
   gd <- get
@@ -114,13 +110,7 @@ commandizePlayer p = do
         playerWalkAnim = (gdAnims gd) ! ("player_walk_" ++ playerDirection)
         playerDirection = if ((^. _x) . playerVelocity) p <= 0.0 then "left" else "right"
         (_,playerRect) = gdSurfaces gd ! playerImage
-  return $ [RenderSprite playerImage (floor <$> pp) RenderPositionTopLeft]
-
-toIntLine :: LineSegment (PointReal) -> LineSegment (Point2 Int)
-toIntLine = fmap (fmap floor)
-
-toPointReal :: Integral a => Point2 a -> PointReal
-toPointReal p = fromIntegral <$> p
+  return (pp `pictureTranslated` (pictureSpriteTopLeft playerImage))
 
 {-
 drawCross :: Surface -> Point2 Int -> IO ()

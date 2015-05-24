@@ -10,6 +10,7 @@ module Jumpie.GameData(
   , renderFinish
   , renderSprites
   , renderClear
+  , render
   ) where
 
 import qualified Data.Set as S
@@ -23,6 +24,8 @@ import           System.Random              (StdGen)
 import Wrench.ImageData(SurfaceMap,AnimMap)
 import qualified Wrench.Platform as P
 import Wrench.Time
+import Wrench.Picture
+import Wrench.Engine
 import Wrench.Color
 import Wrench.Event
 import Wrench.KeyMovement
@@ -36,6 +39,7 @@ data GameData p = GameData {
   , gdCurrentTicks :: !TimeTicks
   , gdTimeDelta    :: !TimeDelta
   , gdKeydowns     :: !Keydowns
+  , gdFont         :: P.PlatformFont p
   }
 
 type GameDataBaseM p = StateT (GameData p) IO
@@ -79,6 +83,13 @@ renderBegin :: P.Platform p => GameDataM p ()
 renderBegin = do
   p <- gets gdPlatform
   liftIO $ P.renderBegin p
+
+render :: P.Platform p => Picture -> GameDataM p ()
+render picture = do
+  p <- gets gdPlatform
+  sf <- gets gdSurfaces
+  font <- gets gdFont
+  liftIO $ wrenchRender p sf font Nothing picture
 
 renderClear :: P.Platform p => Color -> GameDataM p ()
 renderClear color = do
