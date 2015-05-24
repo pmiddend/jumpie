@@ -14,7 +14,7 @@ module Jumpie.Types (
     ) where
 
 import           Jumpie.Geometry.LineSegment (LineSegment)
-import           Jumpie.Geometry.Point (Point2(..))
+import           Jumpie.Geometry.Point (Point2)
 import           Jumpie.Geometry.Rect (Rect())
 import           Wrench.Keysym (Keysym)
 import           ClassyPrelude hiding (Real)

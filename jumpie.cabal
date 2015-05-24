@@ -28,7 +28,6 @@ executable jumpie
                        directory,
                        composition,
                        containers,
-                       parsec,
                        random,
                        bifunctors,
                        wrench,
