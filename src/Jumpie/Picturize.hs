@@ -46,7 +46,7 @@ picturizeParticle :: Particle -> GameDataM p Picture
 picturizeParticle (Particle identifier pos inception) = do
   gd <- get
   let
-    ticks = traceShowId (gdCurrentTicks gd)
+    ticks = gdCurrentTicks gd
     image = currentAnimFrame inception ticks anim
     anim = lookupAnimSafe gd identifier
   return (pos `pictureTranslated` pictureSpriteCentered image)
