@@ -29,6 +29,7 @@ executable jumpie
                        composition,
                        containers,
                        random,
+                       semigroups,
                        bifunctors,
                        wrench,
                        classy-prelude,

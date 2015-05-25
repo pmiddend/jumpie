@@ -9,10 +9,13 @@ import Jumpie.GameConfig
 import           Jumpie.Game
 import           Jumpie.GameObject
 import           Jumpie.GameGeneration
+import qualified Jumpie.LevelGeneration as LG
 import Jumpie.GameState
 import Jumpie.GameData
+import Jumpie.Geometry.Rect
 import Jumpie.Types
 import Wrench.Time
+import Wrench.Rectangle
 import qualified Wrench.Keysym as KS
 import Wrench.Engine (withPlatform)
 import Wrench.Event
@@ -79,6 +82,20 @@ updateCameraPosition cameraPos playerPos =
     V2 x (cameraPos ^. _y)
 
 main :: IO ()
+main = do
+  g <- getStdGen
+  let
+    boundingBox = Rect (V2 0 0) (V2 30 10)
+    maxLen = 5
+    plats = do
+      startPlat <- LG.newLevelGen boundingBox maxLen Nothing
+      nextPlats <- LG.newLevelGen boundingBox maxLen (Just startPlat)
+      --nextPlats' <- LG.newLevelGen boundingBox maxLen (Just (startPlat <> nextPlats))
+      return (startPlat <> nextPlats)
+    --plats = [LG.Platform (V2 2 2) (V2 10 2)]  
+  putStrLn (pack (LG.showPlatformsPpm boundingBox (evalRand plats g)))
+{-
+main :: IO ()
 main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
   \platform -> do
     (images, anims) <- readMediaFiles (loadImage platform) mediaDir
@@ -92,3 +109,4 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()
+-}
