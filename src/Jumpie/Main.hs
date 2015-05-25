@@ -3,7 +3,7 @@ module Main where
 
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
-import           Jumpie.Commandize          (commandizeGameState)
+import           Jumpie.Picturize          (picturizeGameState)
 import           Jumpie.List                (countBy)
 import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
@@ -26,7 +26,7 @@ gameoverMainLoop gameState = do
     updateKeydowns events
     unless (outerGameOver events) $
         do 
-          render =<< commandizeGameState gameState
+          render =<< picturizeGameState gameState
           gameoverMainLoop gameState
 
 stageMainLoop :: Platform p => GameState -> GameDataM p GameState
@@ -48,7 +48,7 @@ stageMainLoop gameState = do
                     , gsStarsCollected = gsStarsCollected gameState +
                       countBy isStarCollected actions
                     }
-            render =<< commandizeGameState gameState
+            render =<< picturizeGameState gameState
             stageMainLoop newState
 
 kdToAction :: KS.Keysym -> [IncomingAction]

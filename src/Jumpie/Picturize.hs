@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Jumpie.Commandize(
+module Jumpie.Picturize(
   RenderPositionMode(..),
-  commandizeGameState
+  picturizeGameState
   ) where
 
 import Data.List((!!))
@@ -34,30 +34,30 @@ import Linear.Vector((^*))
 import Linear.V2
 import Wrench.RenderPositionMode
 
-commandizeGameState :: GameState -> GameDataM p Picture
-commandizeGameState gs = do
-  commandizedObjects <- traverse commandizeObject (gsAllObjects gs)
+picturizeGameState :: GameState -> GameDataM p Picture
+picturizeGameState gs = do
+  picturizedObjects <- traverse picturizeObject (gsAllObjects gs)
   let backgroundPicture = pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))
-  return (backgroundPicture <> pictures commandizedObjects)
+  return (backgroundPicture <> pictures picturizedObjects)
 
-commandizeObject :: GameObject -> GameDataM p Picture
-commandizeObject ob = case ob of
-  ObjectPlayer p -> commandizePlayer p
-  ObjectSensorLine s -> commandizeLine s
-  ObjectBox b -> commandizeBox b
-  ObjectStar s -> commandizeStar s
+picturizeObject :: GameObject -> GameDataM p Picture
+picturizeObject ob = case ob of
+  ObjectPlayer p -> picturizePlayer p
+  ObjectSensorLine s -> picturizeLine s
+  ObjectBox b -> picturizeBox b
+  ObjectStar s -> picturizeStar s
 
-commandizeBox :: Box -> GameDataM p Picture
-commandizeBox (Box p t) = return ((rectTopLeft p) `pictureTranslated` (pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t)))
+picturizeBox :: Box -> GameDataM p Picture
+picturizeBox (Box p t) = return ((rectTopLeft p) `pictureTranslated` (pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t)))
 
-commandizeStar :: Star -> GameDataM p Picture
-commandizeStar (Star pos t) = do
+picturizeStar :: Star -> GameDataM p Picture
+picturizeStar (Star pos t) = do
   currentTicks <- gets gdCurrentTicks
   let wiggledPos = pos + (V2 0 (gcStarWiggleHeight * (sin (toSeconds (currentTicks `tickDelta` t)*gcStarWiggleSpeed))))
   return (wiggledPos `pictureTranslated` (pictureSpriteCentered "star"))
 
-commandizeLine :: SensorLine -> GameDataM p Picture
-commandizeLine (SensorLine s) = return (pictureLine (lineSegmentFrom s) (lineSegmentTo s))
+picturizeLine :: SensorLine -> GameDataM p Picture
+picturizeLine (SensorLine s) = return (pictureLine (lineSegmentFrom s) (lineSegmentTo s))
 
 boxTypeToSuffix :: IsString s => BoxType -> s
 boxTypeToSuffix BoxMiddle = "m"
@@ -65,8 +65,8 @@ boxTypeToSuffix BoxLeft = "l"
 boxTypeToSuffix BoxRight = "r"
 boxTypeToSuffix BoxSingleton = "s"
 
-commandizePlayer :: Player -> GameDataM p Picture
-commandizePlayer p = do
+picturizePlayer :: Player -> GameDataM p Picture
+picturizePlayer p = do
   ticks <- gdCurrentTicks <$> get
   gd <- get
   let   pp = (playerPosition p) - ((^* 0.5) $ (playerRect ^. rectangleDimensions))
