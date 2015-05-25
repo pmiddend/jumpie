@@ -4,7 +4,6 @@ module Main where
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
 import           Jumpie.Picturize          (picturizeGameState)
-import           Jumpie.List                (countBy)
 import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
 import           Jumpie.Game
@@ -34,19 +33,17 @@ stageMainLoop gameState = do
     events <- pollEvents
     updateTicks
     updateKeydowns events
-    if outerGameOver events || gsGameOver gameState || gsStarsCollected gameState == gsStarsTotal gameState
+    if outerGameOver events || gsGameOver gameState
         then return gameState
         else do
             gameData <- get
             let incomingActions = concatMap kdToAction (gdKeydowns gameData)
-            (newPlayer,newObjects,actions) <-
+            (newPlayer,newObjects,_) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
                     { gsPlayer = newPlayer
                     , gsGameOver = testGameOver gameState
                     , gsObjects = newObjects
-                    , gsStarsCollected = gsStarsCollected gameState +
-                      countBy isStarCollected actions
                     }
             render =<< picturizeGameState gameState
             stageMainLoop newState
@@ -76,7 +73,7 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     let
       gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
       (player,objects) = evalRand generateGame g
-      initialGameState = GameState { gsPlayer = player,gsObjects = objects, gsGameOver = False, gsStarsCollected = 0, gsStarsTotal = 10 }
+      initialGameState = GameState { gsPlayer = player,gsObjects = objects, gsGameOver = False }
     (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()

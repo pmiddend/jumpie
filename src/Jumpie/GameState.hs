@@ -10,8 +10,6 @@ data GameState = GameState {
     gsObjects :: [GameObject]
   , gsPlayer :: Player
   , gsGameOver :: Bool
-  , gsStarsCollected :: Int
-  , gsStarsTotal :: Int
   }
 
 gsAllObjects :: GameState -> [GameObject]
