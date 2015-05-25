@@ -11,6 +11,8 @@ module Jumpie.GameData(
   , renderSprites
   , renderClear
   , render
+  , lookupAnimSafe
+  , lookupSurfaceSafe
   ) where
 
 import qualified Data.Set as S
@@ -21,15 +23,19 @@ import           Jumpie.GameConfig          (gcTimeMultiplier)
 
 import           Control.Monad.Random       (RandT, evalRandT)
 import           System.Random              (StdGen)
-import Wrench.ImageData(SurfaceMap,AnimMap)
 import qualified Wrench.Platform as P
 import Wrench.Time
 import Wrench.Picture
 import Wrench.Engine
+import Wrench.ImageData
 import Wrench.Color
 import Wrench.KeyMovement
+import Wrench.Platform(Platform)
+import Wrench.Animation
+import Wrench.AnimId
 import           Jumpie.Types               (Keydowns)
 import ClassyPrelude
+import           Data.Map.Strict             ((!))
 
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (P.PlatformImage p)
@@ -40,6 +46,12 @@ data GameData p = GameData {
   , gdKeydowns     :: !Keydowns
   , gdFont         :: P.PlatformFont p
   }
+
+lookupAnimSafe :: GameData p -> AnimId -> Animation
+lookupAnimSafe gd aid = gdAnims gd ! aid
+
+lookupSurfaceSafe :: Platform p => GameData p -> ImageId -> SurfaceData (P.PlatformImage p)
+lookupSurfaceSafe gd sid = gdSurfaces gd ! sid
 
 type GameDataBaseM p = StateT (GameData p) IO
 

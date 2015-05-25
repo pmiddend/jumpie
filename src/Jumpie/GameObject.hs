@@ -4,7 +4,7 @@ module Jumpie.GameObject(
   BoxType(..),
   Player(Player),
   SensorLine(SensorLine),
-  Star(..),
+  Particle(..),
   line,
   maybeBox,
   playerPosition,
@@ -15,7 +15,7 @@ module Jumpie.GameObject(
   boxPosition,
   boxType,
   isBox,
-  isStar,
+  isParticle,
   isPlayer,
   isSensorLine
   ) where
@@ -24,22 +24,30 @@ import           Jumpie.Geometry.LineSegment (LineSegment)
 import           Jumpie.Types                (PointReal, RectReal)
 import Wrench.Time
 import ClassyPrelude hiding(Real)
+import Wrench.AnimId
 
 data PlayerMode = Ground | Air deriving(Eq,Show)
 
 data Player = Player {
-  playerPosition  :: PointReal,
-  playerMode      :: PlayerMode,
-  playerVelocity  :: PointReal,
-  playerWalkSince :: Maybe TimeTicks
+    playerPosition  :: PointReal
+  , playerMode      :: PlayerMode
+  , playerVelocity  :: PointReal
+  , playerWalkSince :: Maybe TimeTicks
   } deriving(Show)
 
-data Star = Star {
-  starPosition  :: PointReal,
-  starInception :: TimeTicks
-  } deriving(Show)
+data Particle =
+       Particle
+         { particleIdentifier :: AnimId
+         , particlePosition :: PointReal
+         , particleInception :: TimeTicks
+         }
+  deriving Show
 
-data GameObject = ObjectPlayer Player | ObjectBox Box | ObjectSensorLine SensorLine | ObjectStar Star deriving(Show)
+data GameObject = ObjectPlayer Player
+                | ObjectBox Box
+                | ObjectSensorLine SensorLine
+                | ObjectParticle Particle
+  deriving Show
 
 maybeBox :: GameObject -> Maybe Box
 maybeBox (ObjectBox b) = Just b
@@ -57,12 +65,18 @@ isSensorLine :: GameObject -> Bool
 isSensorLine (ObjectSensorLine _) = True
 isSensorLine _ = False
 
-isStar :: GameObject -> Bool
-isStar (ObjectStar _) = True
-isStar _ = False
+isParticle :: GameObject -> Bool
+isParticle (ObjectParticle _) = True
+isParticle _ = False
 
-data BoxType = BoxLeft | BoxRight | BoxSingleton | BoxMiddle deriving(Show)
+data BoxType = BoxLeft
+             | BoxRight
+             | BoxSingleton
+             | BoxMiddle
+  deriving Show
 
-data Box = Box { boxPosition :: RectReal,boxType :: BoxType } deriving(Show)
+data Box = Box { boxPosition :: RectReal, boxType :: BoxType }
+  deriving Show
 
-newtype SensorLine = SensorLine { line :: LineSegment PointReal } deriving(Show)
+newtype SensorLine = SensorLine { line :: LineSegment PointReal }
+  deriving Show

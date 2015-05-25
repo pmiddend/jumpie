@@ -5,57 +5,51 @@ module Jumpie.Picturize(
   ) where
 
 import Data.List((!!))
-import           Data.Map.Strict             ((!))
 import           Data.Maybe                  (fromJust)
---import           Debug.Trace                 (trace)
-import           Control.Monad.State.Strict  (get, gets)
+import           Control.Monad.State.Strict  (get)
 
-import           Jumpie.GameConfig           (gcStarWiggleHeight,
-                                              gcStarWiggleSpeed,screenWidth,screenHeight)
-import           Jumpie.GameData             (GameDataM, gdAnims,
-                                              gdCurrentTicks, gdSurfaces)
-import           Jumpie.GameObject           (Box (Box), BoxType (..),
-                                              GameObject (..), Player,
-                                              PlayerMode (..),
-                                              SensorLine (SensorLine),
-                                              Star (..), playerMode,
-                                              playerPosition, playerVelocity,
-                                              playerWalkSince)
+import           Jumpie.GameConfig           (screenWidth,screenHeight)
+import           Jumpie.GameData
+import           Jumpie.GameObject
 import           Jumpie.GameState
 import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
 import           Jumpie.Geometry.Rect        (rectTopLeft)
 import Control.Lens((^.))
 import Wrench.ImageData
+import Wrench.SpriteIdentifier
+import Wrench.Animation
 import Wrench.Time
-import Wrench.Rectangle
 import Wrench.Picture
+import Wrench.Platform(Platform)
 import ClassyPrelude
-import Linear.Vector((^*))
 import Linear.V2
 import Wrench.RenderPositionMode
 
-picturizeGameState :: GameState -> GameDataM p Picture
+picturizeGameState :: Platform p => GameState -> GameDataM p Picture
 picturizeGameState gs = do
   picturizedObjects <- traverse picturizeObject (gsAllObjects gs)
   let
     backgroundPicture = pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))
   return (backgroundPicture <> (-(gsCameraPosition gs)) `pictureTranslated` pictures picturizedObjects)
 
-picturizeObject :: GameObject -> GameDataM p Picture
+picturizeObject :: Platform p => GameObject -> GameDataM p Picture
 picturizeObject ob = case ob of
   ObjectPlayer p -> picturizePlayer p
   ObjectSensorLine s -> picturizeLine s
   ObjectBox b -> picturizeBox b
-  ObjectStar s -> picturizeStar s
+  ObjectParticle s -> picturizeParticle s
 
 picturizeBox :: Box -> GameDataM p Picture
 picturizeBox (Box p t) = return (rectTopLeft p `pictureTranslated` pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t))
 
-picturizeStar :: Star -> GameDataM p Picture
-picturizeStar (Star pos t) = do
-  currentTicks <- gets gdCurrentTicks
-  let wiggledPos = pos + V2 0 (gcStarWiggleHeight * sin (toSeconds (currentTicks `tickDelta` t)*gcStarWiggleSpeed))
-  return (wiggledPos `pictureTranslated` pictureSpriteCentered "star")
+picturizeParticle :: Particle -> GameDataM p Picture
+picturizeParticle (Particle identifier pos inception) = do
+  gd <- get
+  let
+    ticks = traceShowId (gdCurrentTicks gd)
+    image = currentAnimFrame inception ticks anim
+    anim = lookupAnimSafe gd identifier
+  return (pos `pictureTranslated` pictureSpriteCentered image)
 
 picturizeLine :: SensorLine -> GameDataM p Picture
 picturizeLine (SensorLine s) = return (pictureLine (lineSegmentFrom s) (lineSegmentTo s))
@@ -66,23 +60,30 @@ boxTypeToSuffix BoxLeft = "l"
 boxTypeToSuffix BoxRight = "r"
 boxTypeToSuffix BoxSingleton = "s"
 
-picturizePlayer :: Player -> GameDataM p Picture
+currentAnimFrame :: TimeTicks -> TimeTicks -> Animation -> SpriteIdentifier
+currentAnimFrame animStart currentTicks anim =
+  let
+    tdelta = toSeconds (currentTicks `tickDelta` animStart)
+    noFrames = length (animFrames anim)
+    animIndex = floor (tdelta / (fromIntegral (animFrameSwitch anim) / 1000.0)) `mod` noFrames
+  in
+    animFrames anim !! animIndex
+
+picturizePlayer :: Platform p => Player -> GameDataM p Picture
 picturizePlayer p = do
-  ticks <- gdCurrentTicks <$> get
   gd <- get
-  let   pp = playerPosition p - (^* 0.5) (playerRect ^. rectangleDimensions)
-        playerImage :: Text
-        playerImage
-          | playerMode p == Air = "player_fly_" ++ playerDirection
-          | playerStands || isNothing (playerWalkSince p) = "player_stand"
-          | otherwise = playerImageWalk (fromJust (playerWalkSince p))
-        playerStands = abs (((^. _x) . playerVelocity) p) <= 0.01
-        playerImageWalk walkSince = animFrames playerWalkAnim !! playerImageWalkIndex walkSince
-        playerImageWalkIndex walkSince = floor (toSeconds (ticks `tickDelta` walkSince) / (fromIntegral (animFrameSwitch playerWalkAnim) / 1000.0)) `mod` length (animFrames playerWalkAnim)
-        playerWalkAnim = gdAnims gd ! ("player_walk_" ++ playerDirection)
-        playerDirection = if ((^. _x) . playerVelocity) p <= 0.0 then "left" else "right"
-        (_,playerRect) = gdSurfaces gd ! playerImage
-  return (pp `pictureTranslated` pictureSpriteTopLeft playerImage)
+  let
+    ticks = gdCurrentTicks gd
+    pp = playerPosition p
+    playerImage :: Text
+    playerImage
+      | playerMode p == Air = "player_fly_" ++ playerDirection
+      | playerStands || isNothing (playerWalkSince p) = "player_stand"
+      | otherwise = currentAnimFrame (fromJust (playerWalkSince p)) ticks playerWalkAnim
+    playerStands = abs (((^. _x) . playerVelocity) p) <= 0.01
+    playerWalkAnim = lookupAnimSafe gd ("player_walk_" ++ playerDirection)
+    playerDirection = if ((^. _x) . playerVelocity) p <= 0.0 then "left" else "right"
+  return (pp `pictureTranslated` pictureSpriteCentered playerImage)
 
 {-
 drawCross :: Surface -> Point2 Int -> IO ()

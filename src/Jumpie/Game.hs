@@ -1,22 +1,16 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Jumpie.Game(processGameObjects,testGameOver) where
 
-import           Control.Monad.State.Strict   (gets)
+import           Control.Monad.State.Strict   (gets,get)
 import           Data.Maybe                   (fromJust)
 import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
 import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
                                                gcGrv, gcJmp, gcPlayerHeight,
-                                               gcPlayerMaxSpeed, gcStarLifetime,
-                                               gcWSSize, screenHeight,gcStarCollisionDistance)
-import           Jumpie.GameData              (GameDataM, gdCurrentTicks,
-                                               gdTimeDelta)
-import           Jumpie.GameObject            (Box (Box), GameObject (..),
-                                               Player (Player), PlayerMode (..),
-                                               SensorLine (SensorLine),
-                                               boxPosition, isBox, isPlayer,
-                                               playerMode, playerPosition,
-                                               playerVelocity, playerWalkSince,
-                                               starInception,Star,starPosition)
+                                               gcPlayerMaxSpeed, 
+                                               gcWSSize, screenHeight)
+import           Jumpie.GameData
+import           Jumpie.GameObject
 import           Jumpie.GameState             (GameState, gsObjects,gsPlayer)
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
 import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
@@ -26,9 +20,9 @@ import           Jumpie.Maybe                 (ifMaybe)
 import           Jumpie.Types                 (IncomingAction (..),
                                                LineSegmentReal, PointReal, Real,OutgoingAction(..))
 import ClassyPrelude hiding(Real)
-import Linear.Metric(distance)
 import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.))
+import Wrench.Animation
 
 processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,[GameObject],[OutgoingAction])
 processGameObjects gs actions = do
@@ -45,22 +39,16 @@ processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM p 
 processGameObject gs _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
   ObjectBox b -> return ([ObjectBox b],[])
-  ObjectStar b -> processStar gs b
+  ObjectParticle b -> processParticle gs b
   ObjectSensorLine _ -> return ([],[])
 
-processStar :: GameState -> Star -> GameDataM p ([GameObject],[OutgoingAction])
-processStar gs b = do
+processParticle :: GameState -> Particle -> GameDataM p ([GameObject],[OutgoingAction])
+processParticle _ b = do
   currentTicks <- gets gdCurrentTicks
-  -- Stern abgelaufen?
-  if starInception b `plusDuration` gcStarLifetime < currentTicks
+  gd <- get
+  if particleInception b `plusDuration` animLifetime (lookupAnimSafe gd (particleIdentifier b)) < currentTicks
     then return ([],[])
-    -- Stern kollidiert mit Spieler?
-    else case find isPlayer (gsObjects gs) of
-      Nothing -> return ([ObjectStar b],[])
-      Just (ObjectPlayer p) -> if playerPosition p `distance` starPosition b < gcStarCollisionDistance
-                then return ([],[StarCollected])
-                else return ([ObjectStar b],[])
-      Just _ -> error "Player is not a player, wtf?"
+    else return ([ObjectParticle b],[])
 
 processPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
 processPlayerObject gs ias p = case playerMode p of
@@ -151,57 +139,62 @@ processAirPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p
 processAirPlayerObject gs ias p = do
   t <- gets gdTimeDelta
   currentTicks <- gets gdCurrentTicks
-  let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-        sensors = applySensors (gsObjects gs) (playerPosition p) 0.0
-        fCollision = sensFLCollision sensors <|> sensFRCollision sensors
-        cCollision = sensCLCollision sensors <|> sensCRCollision sensors
-        movingDownwards = ((^. _y) . playerVelocity) p >= 0.0
-        oldPlayerPositionX = ((^. _x) . playerPosition) p
-        oldPlayerPositionY = ((^. _y) . playerPosition) p
-        oldPlayerVelocityX = ((^. _x)  . playerVelocity) p
-        oldPlayerVelocityY = ((^. _y) . playerVelocity) p
-        playerIsAboveBox b = case b of
-          (ObjectBox (Box r _)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
-          _ -> False
-        playerIsBelowBox b = case b of
-          (ObjectBox (Box r _)) -> oldPlayerPositionY + gcPlayerHeight > top r
-          _ -> False
-        -- Ist der naechste Zustand der Bodenzustand?
-        newPlayerMode = case fCollision of
-          Just b -> if movingDownwards && playerIsBelowBox b
-                    then Ground
-                    else Air
-          _ -> Air
-        newPlayerPositionX = case sensWCollision sensors of
-          Just (ObjectBox (Box r _)) -> if ((^. _x) . center) r < oldPlayerPositionX
-                                     then right r + gcWSSize + 1.0
-                                     else left r - (gcWSSize + 1.0)
-          _ -> oldPlayerPositionX + toSeconds t * oldPlayerVelocityX
-        newPlayerPositionY = case cCollision of
-          Just b@(ObjectBox (Box r _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
-                                        then bottom r + gcPlayerHeight
-                                        else oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
-          _ -> oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
-        playerAcc
-          | PlayerLeft `elem` ias = Just (-gcAir)
-          | PlayerRight `elem` ias = Just gcAir
-          | otherwise = Nothing
-        newPlayerVelocityX = if isJust (sensWCollision sensors)
-                             then 0.0
-                             else case playerAcc of
-                               Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
-                               Nothing -> airDrag oldPlayerVelocityX
-        newPlayerVelocityY
-          | oldPlayerVelocityY < 0.0 && isJust cCollision && playerIsAboveBox (fromJust cCollision) = toSeconds t * gcGrv
-          | oldPlayerVelocityY < (-4.0) && (PlayerJump `onotElem` ias) = -4.0
-          | otherwise = oldPlayerVelocityY + toSeconds t * gcGrv
-        airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125
-                     then xv * 0.9685
-                     else xv
-        np = Player {
-          playerPosition = V2 newPlayerPositionX newPlayerPositionY,
-          playerMode = newPlayerMode,
-          playerVelocity = V2 newPlayerVelocityX newPlayerVelocityY,
-          playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
-          }
-  return (np,sensorLines,[])
+  let
+    sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
+    sensors = applySensors (gsObjects gs) (playerPosition p) 0.0
+    fCollision = sensFLCollision sensors <|> sensFRCollision sensors
+    cCollision = sensCLCollision sensors <|> sensCRCollision sensors
+    movingDownwards = ((^. _y) . playerVelocity) p >= 0.0
+    oldPlayerPositionX = ((^. _x) . playerPosition) p
+    oldPlayerPositionY = ((^. _y) . playerPosition) p
+    oldPlayerVelocityX = ((^. _x)  . playerVelocity) p
+    oldPlayerVelocityY = ((^. _y) . playerVelocity) p
+    playerIsAboveBox b = case b of
+      (ObjectBox (Box r _)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
+      _ -> False
+    playerIsBelowBox b = case b of
+      (ObjectBox (Box r _)) -> oldPlayerPositionY + gcPlayerHeight > top r
+      _ -> False
+    -- Ist der naechste Zustand der Bodenzustand?
+    newPlayerMode = case fCollision of
+      Just b -> if movingDownwards && playerIsBelowBox b
+                then Ground
+                else Air
+      _ -> Air
+    dirt =
+      if newPlayerMode == Ground
+      then [ObjectParticle (Particle "dirt" (playerPosition p) currentTicks)]
+      else []
+    newPlayerPositionX = case sensWCollision sensors of
+      Just (ObjectBox (Box r _)) -> if ((^. _x) . center) r < oldPlayerPositionX
+                                 then right r + gcWSSize + 1.0
+                                 else left r - (gcWSSize + 1.0)
+      _ -> oldPlayerPositionX + toSeconds t * oldPlayerVelocityX
+    newPlayerPositionY = case cCollision of
+      Just b@(ObjectBox (Box r _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
+                                    then bottom r + gcPlayerHeight
+                                    else oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
+      _ -> oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
+    playerAcc
+      | PlayerLeft `elem` ias = Just (-gcAir)
+      | PlayerRight `elem` ias = Just gcAir
+      | otherwise = Nothing
+    newPlayerVelocityX = if isJust (sensWCollision sensors)
+                         then 0.0
+                         else case playerAcc of
+                           Just v -> clampAbs gcPlayerMaxSpeed $ oldPlayerVelocityX + v
+                           Nothing -> airDrag oldPlayerVelocityX
+    newPlayerVelocityY
+      | oldPlayerVelocityY < 0.0 && isJust cCollision && playerIsAboveBox (fromJust cCollision) = toSeconds t * gcGrv
+      | oldPlayerVelocityY < (-4.0) && (PlayerJump `onotElem` ias) = -4.0
+      | otherwise = oldPlayerVelocityY + toSeconds t * gcGrv
+    airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125
+                 then xv * 0.9685
+                 else xv
+    np = Player {
+      playerPosition = V2 newPlayerPositionX newPlayerPositionY,
+      playerMode = newPlayerMode,
+      playerVelocity = V2 newPlayerVelocityX newPlayerVelocityY,
+      playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
+      }
+  return (np,dirt <> sensorLines,[])
