@@ -26,7 +26,7 @@ gameoverMainLoop gameState = do
     updateKeydowns events
     unless (outerGameOver events) $
         do 
-          render =<< (commandizeGameState gameState)
+          render =<< commandizeGameState gameState
           gameoverMainLoop gameState
 
 stageMainLoop :: Platform p => GameState -> GameDataM p GameState
@@ -34,23 +34,21 @@ stageMainLoop gameState = do
     events <- pollEvents
     updateTicks
     updateKeydowns events
-    if (outerGameOver events || gsGameOver gameState || gsStarsCollected
-                                                            gameState ==
-                                                        gsStarsTotal gameState)
+    if outerGameOver events || gsGameOver gameState || gsStarsCollected gameState == gsStarsTotal gameState
         then return gameState
         else do
             gameData <- get
             let incomingActions = concatMap kdToAction (gdKeydowns gameData)
-            (newObjects,actions) <-
+            (newPlayer,newObjects,actions) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
-                    { gsGameOver = testGameOver gameState
-                    , gsObjects = newObjects{- ++
-                      (map ObjectStar remainingStars)-}
+                    { gsPlayer = newPlayer
+                    , gsGameOver = testGameOver gameState
+                    , gsObjects = newObjects
                     , gsStarsCollected = gsStarsCollected gameState +
-                      (countBy isStarCollected actions)
+                      countBy isStarCollected actions
                     }
-            render =<< (commandizeGameState gameState)
+            render =<< commandizeGameState gameState
             stageMainLoop newState
 
 kdToAction :: KS.Keysym -> [IncomingAction]
@@ -63,7 +61,7 @@ kdToAction sc = fromMaybe [] $
 
 -- Vorfilterung der Events, ob das Spiel beendet werden soll
 outerGameOver :: [Event] -> Bool
-outerGameOver events = any outerGameOver' events
+outerGameOver = any outerGameOver'
     where outerGameOver' Quit = True
           outerGameOver' (Keyboard _ _ KS.Escape) = True
           outerGameOver' _ = False
@@ -75,9 +73,10 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     ticks <- getTicks
     g <- getStdGen
     font <- loadFont platform (mediaDir <> "/stdfont.ttf") 15
-    let gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
-    let initialGameState = GameState { gsObjects = (evalRand generateGame g), gsGameOver = False, gsStarsCollected = 0, gsStarsTotal = 10 }
-    (lastGameState, lastGameData) <- runGame g gameData $
-                                       stageMainLoop initialGameState
+    let
+      gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
+      (player,objects) = evalRand generateGame g
+      initialGameState = GameState { gsPlayer = player,gsObjects = objects, gsGameOver = False, gsStarsCollected = 0, gsStarsTotal = 10 }
+    (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()

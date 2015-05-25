@@ -43,15 +43,15 @@ showPlatformsPpm :: RectInt -> [Platform] -> String
 showPlatformsPpm r@(Rect _ (V2  w h)) ps = unlines $ ["P1",show w ++ " " ++ show h] ++ (reverse $ (intersperse ' ') <$> (showPlatforms r ps))
 
 validPlatforms :: MonadRandom m => Int -> [Parabola Real] -> m Platform -> m [Platform]
-validPlatforms max paras randPlat = validPlatforms' max paras randPlat []
+validPlatforms ma paras randPlat = validPlatforms' ma paras randPlat []
 
 validPlatforms' :: MonadRandom m => Int -> [Parabola Real] -> m Platform -> [Platform] -> m [Platform]
-validPlatforms' max paras randPlat ns | length ns == max = return ns
+validPlatforms' ma paras randPlat ns | length ns == ma = return ns
                                       | otherwise = do
                                         x <- randPlat
                                         if not (intersects ns x) && not (unreachable ns x)
-                                          then validPlatforms' max paras randPlat (x:ns)
-                                          else validPlatforms' max paras randPlat ns
+                                          then validPlatforms' ma paras randPlat (x:ns)
+                                          else validPlatforms' ma paras randPlat ns
   where intersects :: [Platform] -> Platform -> Bool
         intersects ps p = or r
           where r = pure (pIntersects p) <*> ps

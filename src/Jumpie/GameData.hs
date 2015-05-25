@@ -27,7 +27,6 @@ import Wrench.Time
 import Wrench.Picture
 import Wrench.Engine
 import Wrench.Color
-import Wrench.Event
 import Wrench.KeyMovement
 import           Jumpie.Types               (Keydowns)
 import ClassyPrelude

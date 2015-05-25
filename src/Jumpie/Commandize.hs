@@ -21,7 +21,7 @@ import           Jumpie.GameObject           (Box (Box), BoxType (..),
                                               Star (..), playerMode,
                                               playerPosition, playerVelocity,
                                               playerWalkSince)
-import           Jumpie.GameState            (GameState, gsObjects)
+import           Jumpie.GameState            (GameState, gsAllObjects)
 import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
 import           Jumpie.Geometry.Rect        (rectTopLeft)
 import Control.Lens((^.))
@@ -36,8 +36,9 @@ import Wrench.RenderPositionMode
 
 commandizeGameState :: GameState -> GameDataM p Picture
 commandizeGameState gs = do
-  commandizedObjects <- mapM commandizeObject (gsObjects gs)
-  return (pictures ([pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))] <> commandizedObjects))
+  commandizedObjects <- traverse commandizeObject (gsAllObjects gs)
+  let backgroundPicture = pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))
+  return (backgroundPicture <> pictures commandizedObjects)
 
 commandizeObject :: GameObject -> GameDataM p Picture
 commandizeObject ob = case ob of
