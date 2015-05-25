@@ -7,6 +7,7 @@ import           Jumpie.Picturize          (picturizeGameState)
 import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
 import           Jumpie.Game
+import           Jumpie.GameObject
 import           Jumpie.GameGeneration
 import Jumpie.GameState
 import Jumpie.GameData
@@ -18,6 +19,8 @@ import Wrench.Event
 import Wrench.ImageData (readMediaFiles)
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
+import Control.Lens((^.))
+import Linear.V2
 
 gameoverMainLoop :: Platform p => GameState -> GameDataM p ()
 gameoverMainLoop gameState = do
@@ -44,6 +47,7 @@ stageMainLoop gameState = do
                     { gsPlayer = newPlayer
                     , gsGameOver = testGameOver gameState
                     , gsObjects = newObjects
+                    , gsCameraPosition = updateCameraPosition (gsCameraPosition gameState) (playerPosition newPlayer)
                     }
             render =<< picturizeGameState gameState
             stageMainLoop newState
@@ -63,6 +67,17 @@ outerGameOver = any outerGameOver'
           outerGameOver' (Keyboard _ _ KS.Escape) = True
           outerGameOver' _ = False
 
+updateCameraPosition :: PointReal -> PointReal -> PointReal
+updateCameraPosition cameraPos playerPos =
+  let
+    k = cameraPos ^. _x
+    px = playerPos ^. _x
+    w = fromIntegral screenWidth
+    z = fromIntegral cameraTolerance
+    x = min (max k ((w-z)/2 + px - w)) (px - (w-z)/2)
+  in
+    V2 x (cameraPos ^. _y)
+
 main :: IO ()
 main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
   \platform -> do
@@ -73,7 +88,7 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     let
       gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
       (player,objects) = evalRand generateGame g
-      initialGameState = GameState { gsPlayer = player,gsObjects = objects, gsGameOver = False }
+      initialGameState = GameState { gsPlayer = player,gsObjects = objects, gsGameOver = False,gsCameraPosition = V2 0 0 }
     (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()

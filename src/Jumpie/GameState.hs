@@ -5,11 +5,13 @@ module Jumpie.GameState(
 
 import           Jumpie.GameObject (GameObject(..),Player)
 import ClassyPrelude
+import Jumpie.Types
 
 data GameState = GameState {
     gsObjects :: [GameObject]
   , gsPlayer :: Player
   , gsGameOver :: Bool
+  , gsCameraPosition :: PointReal
   }
 
 gsAllObjects :: GameState -> [GameObject]

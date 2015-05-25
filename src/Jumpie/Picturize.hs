@@ -21,7 +21,7 @@ import           Jumpie.GameObject           (Box (Box), BoxType (..),
                                               Star (..), playerMode,
                                               playerPosition, playerVelocity,
                                               playerWalkSince)
-import           Jumpie.GameState            (GameState, gsAllObjects,gsPlayer)
+import           Jumpie.GameState
 import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
 import           Jumpie.Geometry.Rect        (rectTopLeft)
 import Control.Lens((^.))
@@ -39,8 +39,7 @@ picturizeGameState gs = do
   picturizedObjects <- traverse picturizeObject (gsAllObjects gs)
   let
     backgroundPicture = pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))
-    playerX = playerPosition (gsPlayer gs) ^. _x
-  return (backgroundPicture <> V2 (-playerX) 0 `pictureTranslated` pictures picturizedObjects)
+  return (backgroundPicture <> (-(gsCameraPosition gs)) `pictureTranslated` pictures picturizedObjects)
 
 picturizeObject :: GameObject -> GameDataM p Picture
 picturizeObject ob = case ob of

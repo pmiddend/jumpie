@@ -5,6 +5,7 @@ module Jumpie.GameConfig(
   gcPlayerMaxSpeed,
   gcStars,
   gcDec,
+  cameraTolerance,
   gcStarCollisionDistance,
   gcAir,
   gcGrv,
@@ -31,10 +32,11 @@ import ClassyPrelude hiding(Real)
 
 backgroundColor :: Color
 backgroundColor = mkColorFromRgba 94 129 162 255
-
-screenWidth,screenHeight :: Int
+                  
+screenWidth,screenHeight,cameraTolerance :: Int
 screenWidth = 1200
 screenHeight = 400
+cameraTolerance = 200
 mediaDir :: String
 mediaDir = "media"
 
