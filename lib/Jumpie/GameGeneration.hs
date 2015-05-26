@@ -14,8 +14,7 @@ import           Jumpie.Types           (PointInt, PointReal, RectInt)
 --import Jumpie.Debug(traceShowId)
 import           Control.Monad.Random   (MonadRandom)
 import ClassyPrelude
-import           Jumpie.LevelGeneration (Platform (Platform), easyParabolas,
-                                         pTiles, randomPlatform, validPlatforms)
+import           Jumpie.LevelGeneration (Platform (Platform), pTiles)
 import Wrench.Time
 import Linear.V2
 
@@ -71,7 +70,7 @@ randomStar ticks xs = do
 
 generateGame :: MonadRandom m => m (Player,[GameObject])
 generateGame = do
-  plats <- validPlatforms gcPlatCount easyParabolas (randomPlatform tilesRect gcPlatMaxLength)
+  plats <- undefined--validPlatforms gcPlatCount easyParabolas (randomPlatform tilesRect gcPlatMaxLength)
   let platformPoints = platsToPoints plats
       boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
   rawPlayerPos <- randomAbovePlatPosition boxes

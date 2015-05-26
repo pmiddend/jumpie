@@ -4,7 +4,8 @@ module Main where
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
 import           Jumpie.Picturize          (picturizeGameState)
-import           Control.Monad.Random       (evalRand)
+import           Control.Monad.Random       (evalRand,evalRandT)
+import           Control.Monad.Writer.Strict       (runWriterT)
 import Jumpie.GameConfig
 import           Jumpie.Game
 import           Jumpie.GameObject
@@ -88,12 +89,14 @@ main = do
     boundingBox = Rect (V2 0 0) (V2 30 10)
     maxLen = 5
     plats = do
-      startPlat <- LG.newLevelGen boundingBox maxLen Nothing
-      nextPlats <- LG.newLevelGen boundingBox maxLen (Just startPlat)
+      startPlat <- LG.newLevelGen (0,9) maxLen []
+      nextPlats <- LG.newLevelGen (0,9) maxLen startPlat
       --nextPlats' <- LG.newLevelGen boundingBox maxLen (Just (startPlat <> nextPlats))
       return (startPlat <> nextPlats)
     --plats = [LG.Platform (V2 2 2) (V2 10 2)]  
-  putStrLn (pack (LG.showPlatformsPpm boundingBox (evalRand plats g)))
+  (r,logLines) <- runWriterT (evalRandT plats g)
+  mapM_ putStrLn logLines
+  putStrLn (pack (LG.showPlatformsPpm boundingBox r))
 {-
 main :: IO ()
 main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
