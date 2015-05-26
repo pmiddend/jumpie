@@ -12,6 +12,7 @@ module Jumpie.LevelGeneration(
   platformReachable,
   playerMaxJumpHeight,
   playerMaxJumpWidth,
+  platformManhattanDistance,
   newLevelGen) where
 
 --import           Control.Category             ((>>>))
@@ -116,16 +117,16 @@ randomPlatformAt (V2 x y) maxLength = do
   return $ Platform (V2 x y) (V2 (x+plength) y)
 
 playerMaxJumpHeight :: Real
-playerMaxJumpHeight = paraZenith (playerParabola 1)
+playerMaxJumpHeight = -(gcJmp*gcJmp)/(2*(-gcGrv))
 
 playerMaxJumpWidth :: Real
-playerMaxJumpWidth =
-  let (l,r) = paraBounds (playerParabola 1) 0
-  in abs (r - l)
+playerMaxJumpWidth = (2*(-gcJmp)*gcPlayerMaxSpeed)/gcGrv
 
+{-
 playerParabola :: Real -> Parabola Real
 playerParabola fmult = Parabola (-gcGrv/(2*f*f),-gcJmp/f,0)
   where f = fmult * (-1) * (gcPlayerMaxSpeed * gcTimeMultiplier * gcGrv) / gcJmp
+-}
 
 pHigher :: Platform -> Platform -> Bool
 pHigher p1 p2 = pHeight p1 > pHeight p2

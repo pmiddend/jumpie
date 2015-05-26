@@ -13,7 +13,7 @@ maintainer:          pmidden+jumpie@secure.mailbox.org
 -- copyright:
 category:            Game
 build-type:          Simple
-cabal-version:       >=1.8
+cabal-version:       >=1.10
 
 source-repository head
   type: git
@@ -54,7 +54,8 @@ library
                        lens,
                        linear
   ghc-options: -Wall
-  extensions: NoImplicitPrelude
+  default-language:    Haskell2010
+  default-extensions: NoImplicitPrelude
 
 test-suite hunit
   type:                exitcode-stdio-1.0
@@ -70,10 +71,10 @@ test-suite hunit
                      , linear
   default-language:    Haskell2010
   default-extensions: NoImplicitPrelude
-  
-executable jumpie
-  hs-source-dirs:      src
-  main-is:             Jumpie/Main.hs
+
+executable example_level_generator
+  hs-source-dirs:      examples
+  main-is:             LevelGenerator.hs
   build-depends:       jumpie
                      , base >= 4.6
                      , linear
@@ -84,4 +85,21 @@ executable jumpie
                      , mtl
                      , random
   ghc-options: -Wall
-  extensions: NoImplicitPrelude
+  default-language:    Haskell2010
+  default-extensions: NoImplicitPrelude
+  
+executable jumpie
+  hs-source-dirs:      main/
+  main-is:             Main.hs
+  build-depends:       jumpie
+                     , base >= 4.6
+                     , linear
+                     , lens
+                     , wrench
+                     , classy-prelude
+                     , MonadRandom
+                     , mtl
+                     , random
+  ghc-options: -Wall
+  default-language:    Haskell2010
+  default-extensions: NoImplicitPrelude
