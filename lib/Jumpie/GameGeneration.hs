@@ -21,7 +21,7 @@ import ClassyPrelude hiding(head,minimum,maximum,Real)
 import           Jumpie.LevelGeneration (Platform (Platform), pTiles)
 import Linear.V2
 import Wrench.Time
-import Control.Lens((^.))
+import Control.Lens((^.),view,(&),(+~))
 import Data.List(head,minimum,maximum)
 
   {-
@@ -66,7 +66,7 @@ platToBoxes currentTicks plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
                 hasRight = V2 (x + 1) y `elem` plats
 
 abovePlatPosition :: Box -> PointReal
-abovePlatPosition = (+ (V2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition
+abovePlatPosition b = (b ^. boxPosition . rectTopLeft) & _x +~ (fromIntegral gcTileSize / 2)
 
 {-
 randomStar :: MonadRandom m => TimeTicks -> [GameObject] -> m Star
@@ -89,9 +89,9 @@ generateSection timeTicks = do
 
 sectionWidth :: WorldSection -> (Real,Real)
 sectionWidth objects =
-  let boxes = boxPosition <$> (mapMaybe maybeBox objects)
-      minPos = minimum (((^. _x) . rectTopLeft) <$> boxes)
-      maxPos = maximum (((^. _x) . rectBottomRight) <$> boxes)
+  let boxes = view boxPosition <$> (mapMaybe maybeBox objects)
+      minPos = minimum (view (rectTopLeft . _x) <$> boxes)
+      maxPos = maximum (view (rectBottomRight . _x) <$> boxes)
   in (minPos,maxPos)
 
 moveSection :: Real -> WorldSection -> WorldSection
@@ -101,14 +101,14 @@ generateGame :: MonadRandom m => TimeTicks -> m (Player,[WorldSection])
 generateGame currentTicks = do
   section <- generateSection currentTicks
   let
-    firstBox = head (sortBy (comparing ((^. _x). rectTopLeft . boxPosition)) (mapMaybe maybeBox section))
+    firstBox = head (sortBy (comparing (view (boxPosition . rectTopLeft . _x))) (mapMaybe maybeBox section))
     rawPlayerPos = abovePlatPosition firstBox
     playerPos = rawPlayerPos + V2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize))
   let player = Player {
-        playerPosition = playerPos,
-        playerMode = Air,
-        playerVelocity = V2 0.0 0.0,
-        playerWalkSince = Nothing
+        _playerPosition = playerPos,
+        _playerMode = Air,
+        _playerVelocity = V2 0.0 0.0,
+        _playerWalkSince = Nothing
       }
   secondSection <- generateSection (currentTicks `plusDuration` fromSeconds 20)
   let (_,firstSectionEnd) = sectionWidth section

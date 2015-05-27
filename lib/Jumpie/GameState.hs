@@ -1,23 +1,34 @@
+{-# LANGUAGE TemplateHaskell #-}
 module Jumpie.GameState(
     GameState(..)
   , gsAllObjects
+  , gsSections
+  , gsTempSection
+  , gsPlayer
+  , gsGameOver
+  , gsCameraPosition
   ) where
 
 import           Jumpie.GameObject
 import           Jumpie.GameGeneration
 import ClassyPrelude
 import Jumpie.Types
+import Control.Lens.TH
+import Control.Lens((^.))
+import Control.Lens.Getter(to,Getter)
 
 data GameState = GameState {
-    gsSections :: [WorldSection]
-  , gsTempSection :: WorldSection
-  , gsPlayer :: Player
-  , gsGameOver :: Bool
-  , gsCameraPosition :: PointReal
+    _gsSections :: [WorldSection]
+  , _gsTempSection :: WorldSection
+  , _gsPlayer :: Player
+  , _gsGameOver :: Bool
+  , _gsCameraPosition :: PointReal
   }
 
-gsAllObjects :: GameState -> [GameObject]
-gsAllObjects gs = gsPlayerPacked gs : (gsTempSection gs ++ join (gsSections gs))
+$(makeClassy ''GameState)
 
-gsPlayerPacked :: GameState -> GameObject
-gsPlayerPacked = ObjectPlayer . gsPlayer
+gsAllObjects :: Getter GameState [GameObject]
+gsAllObjects = to (\gs -> gs ^. gsPlayerPacked : (gs ^. gsTempSection ++ join (gs ^. gsSections)))
+
+gsPlayerPacked :: Getter GameState GameObject
+gsPlayerPacked = to (ObjectPlayer . (^. gsPlayer))

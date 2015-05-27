@@ -20,7 +20,7 @@ import ClassyPrelude
 import Linear.Vector((*^))
 import Linear.Metric(dot)
 import Linear.V2(_x,_y)
-import Control.Lens((^.))
+import Control.Lens((^.),view)
 
 lineSegmentIntersects :: (Num a,Fractional a,Ord a) => a -> LineSegment (Point2 a) -> LineSegment (Point2 a) -> Bool
 lineSegmentIntersects delta l1 l2 = isJust $ lineSegmentIntersection delta l1 l2
@@ -44,21 +44,21 @@ lineSegmentIntersection delta (LineSegment p to1) (LineSegment q to2)
         overlapping = (0 <= ((q - p) `dot` r) && ((q - p) `dot` r) <= (r `dot` r)) || (0 <= (p - q) `dot` s && (p - q) `dot` s <= s `dot` s)
 
 rectIntersects :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> Rect (Point2 a) -> Bool
-rectIntersects delta a b = a `inside` b || b `inside` a || or (isJust .: lineSegmentIntersection delta <$> lineSegments a <*> lineSegments b)
+rectIntersects delta a b = a `inside` b || b `inside` a || or (isJust .: lineSegmentIntersection delta <$> (a ^. lineSegments) <*> (b ^. lineSegments))
 
 pointInsideRect :: Ord a => Rect (Point2 a) -> Point2 a -> Bool
-pointInsideRect r p = and $ zipWith betweenRE (zip (pointToList . rectTopLeft $ r) (pointToList . rectBottomRight $ r)) (pointToList p)
+pointInsideRect r p = and $ zipWith betweenRE (zip (pointToList . (view rectTopLeft) $ r) (pointToList . (view rectBottomRight) $ r)) (pointToList p)
   where betweenRE :: Ord a => (a,a) -> a -> Bool
         betweenRE (left,right) a = a >= left && a < right
 
 rectLineSegmentIntersection :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> LineSegment (Point2 a) -> Maybe (Point2 a)
-rectLineSegmentIntersection delta rect line = headOrNothing (pure (lineSegmentIntersection delta line) <*> lineSegments rect)
+rectLineSegmentIntersection delta rect line = headOrNothing (pure (lineSegmentIntersection delta line) <*> (rect ^. lineSegments))
 
 -- Vorsicht: das ist nicht direkt rectLineSegmentIntersection.
 -- Diese Funktion enthaelt auch den Fall, dass die Linie
 -- komplett im Rect ist.
 rectLineSegmentIntersects :: (Num a,Fractional a,Ord a) => a -> Rect (Point2 a) -> LineSegment (Point2 a) -> Bool
-rectLineSegmentIntersects delta rect line = or (pure (lineSegmentIntersects delta line) <*> lineSegments rect) || lineSegmentInsideRect line rect
+rectLineSegmentIntersects delta rect line = or (pure (lineSegmentIntersects delta line) <*> (rect ^. lineSegments)) || lineSegmentInsideRect line rect
 
 lineSegmentInsideRect :: Ord a => LineSegment (Point2 a) -> Rect (Point2 a) -> Bool
 lineSegmentInsideRect line r = and (map (pointInsideRect r) (pointList line))

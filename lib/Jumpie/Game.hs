@@ -22,17 +22,18 @@ import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.))
 import Wrench.Animation
 import Data.List(tail,head,last)
+import Control.Lens(_1,_2,view)
 
 processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
 processGameObjects gs actions = do
   -- [(WorldSection,[OutgoingAction])]
-  sectionsWithActions <- traverse (processWorldSection gs actions) (gsSections gs)
-  (newTempSection,tempSectionActions) <- processWorldSection gs actions (gsTempSection gs)
+  sectionsWithActions <- traverse (processWorldSection gs actions) (gs ^. gsSections)
+  (newTempSection,tempSectionActions) <- processWorldSection gs actions (gs ^. gsTempSection)
   ticks <- gets gdCurrentTicks
   let
-    sections = fst <$> sectionsWithActions
-    secActions = join (snd <$> sectionsWithActions)
-  (newPlayer,playerObjects,playerActions) <- processPlayerObject gs actions (gsPlayer gs) 
+    sections = view _1 <$> sectionsWithActions
+    secActions = join ((view _2) <$> sectionsWithActions)
+  (newPlayer,playerObjects,playerActions) <- processPlayerObject gs actions (gs ^. gsPlayer) 
   let
     firstSection = head sections
     tailSections = tail sections
@@ -48,9 +49,10 @@ processGameObjects gs actions = do
         newTempSectionMoved = moveSection newFirstSectionStart newTempSection
         movedTails = (moveSection newFirstSectionStart) <$> tailSections
       newSection <- moveSection (lastSectionEnd-newFirstSectionStart+fromIntegral gcTileSize) <$> (generateSection ticks)
-      return (newPlayer,V2 (gsCameraPosition gs ^. _x - newFirstSectionStart) (gsCameraPosition gs ^. _y),newTempSectionMoved,(movedTails ++ [newSection]),totalActions)
+      -- TODO: camera position only changes x value - better lens here
+      return (newPlayer,V2 (gs ^. gsCameraPosition ^. _x - newFirstSectionStart) (gs ^. gsCameraPosition  ^. _y),newTempSectionMoved,(movedTails ++ [newSection]),totalActions)
     xs -> do
-      return (newPlayer,gsCameraPosition gs,newTempSection <> playerObjects,xs : tailSections,totalActions)
+      return (newPlayer,gs ^. gsCameraPosition,newTempSection <> playerObjects,xs : tailSections,totalActions)
   
 
 processWorldSection :: GameState -> [IncomingAction] -> WorldSection -> GameDataM p (WorldSection,[OutgoingAction])
@@ -65,25 +67,25 @@ processGameObject gs _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
   ObjectBox b -> do
     ticks <- gets gdCurrentTicks
-    if ticks > boxDeadline b
+    if ticks > b ^. boxDeadline
       then return ([],[])
       else return ([ObjectBox b],[])
   ObjectParticle b -> processParticle gs b
   ObjectSensorLine _ -> return ([],[])
 
 testGameOver :: GameState -> Bool
-testGameOver os = ((^. _y) . playerPosition) (gsPlayer os) > fromIntegral screenHeight
+testGameOver os = (os ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screenHeight
 
 processParticle :: GameState -> Particle -> GameDataM p ([GameObject],[OutgoingAction])
 processParticle _ b = do
   currentTicks <- gets gdCurrentTicks
   gd <- get
-  if particleInception b `plusDuration` animLifetime (lookupAnimSafe gd (particleIdentifier b)) < currentTicks
+  if (b ^. particleInception) `plusDuration` ((lookupAnimSafe gd (b ^. particleIdentifier)) ^. animLifetime)  < currentTicks
     then return ([],[])
     else return ([ObjectParticle b],[])
 
 processPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
-processPlayerObject gs ias p = case playerMode p of
+processPlayerObject gs ias p = case p ^. playerMode of
   Ground -> processGroundPlayerObject gs ias p
   Air -> processAirPlayerObject gs ias p
 
@@ -91,7 +93,7 @@ processPlayerObject gs ias p = case playerMode p of
 lineCollision :: [GameObject] -> LineSegmentReal -> Maybe GameObject
 lineCollision boxes l = (getFirst . mconcat . map (First . collides l)) boxes
   where collides :: LineSegmentReal -> GameObject -> Maybe GameObject
-        collides l1 bp@(ObjectBox b) = ifMaybe (rectLineSegmentIntersects 0.01 (boxPosition b) l1) bp
+        collides l1 bp@(ObjectBox b) = ifMaybe (rectLineSegmentIntersects 0.01 (b ^. boxPosition) l1) bp
         collides _ _ = Nothing
 
 data Sensors = Sensors {
@@ -134,21 +136,21 @@ processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameData
 processGroundPlayerObject gs ias p = do
   t <- gets gdTimeDelta
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-        sensors = applySensors (gsAllObjects gs) (playerPosition p) 4.0
+        sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 4.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
         newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
                         then Air
                         else Ground
         newPlayerPositionX = case sensWCollision sensors of
-          Just (ObjectBox (Box r _ _)) -> if ((^. _x) . center) r < ((^. _x) . playerPosition) p
-                                     then right r + gcWSSize + 1.0
-                                     else left r - (gcWSSize + 1.0)
-          _ -> ((^. _x) . playerPosition) p + toSeconds t * ((^. _x) . playerVelocity) p
+          Just (ObjectBox (Box r _ _)) -> if r ^. center . _x < p ^. playerPosition . _x
+                                     then r ^. right + gcWSSize + 1.0
+                                     else r ^. left - (gcWSSize + 1.0)
+          _ -> p ^. playerPosition . _x + toSeconds t * p ^. playerVelocity ^. _x
         newPlayerPositionY = case fCollision of
-          Just (ObjectBox (Box r _ _)) -> top r - gcPlayerHeight
-          _ -> ((^. _y) . playerPosition) p
+          Just (ObjectBox (Box r _ _)) -> r ^. top - gcPlayerHeight
+          _ -> p ^. playerPosition . _y
         newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
-        oldPlayerVelocityX = ((^. _x)  . playerVelocity) p
+        oldPlayerVelocityX = p ^. playerVelocity ^. _x
         playerAcc
           | PlayerLeft `elem` ias = Just $ if oldPlayerVelocityX > 0.0 then -gcDec else (-gcAcc)
           | PlayerRight `elem` ias = Just $ if oldPlayerVelocityX < 0.0 then gcDec else gcAcc
@@ -160,10 +162,10 @@ processGroundPlayerObject gs ias p = do
                             then V2 0.0 0.0
                             else V2 newPlayerVelocityX newPlayerVelocityY
         np = Player {
-          playerPosition = V2 newPlayerPositionX newPlayerPositionY,
-          playerMode = newPlayerMode,
-          playerVelocity = newPlayerVelocity,
-          playerWalkSince = if newPlayerMode == Ground then playerWalkSince p else Nothing
+          _playerPosition = V2 newPlayerPositionX newPlayerPositionY,
+          _playerMode = newPlayerMode,
+          _playerVelocity = newPlayerVelocity,
+          _playerWalkSince = if newPlayerMode == Ground then p ^. playerWalkSince else Nothing
           }
   return (np,sensorLines,[])
 
@@ -173,19 +175,19 @@ processAirPlayerObject gs ias p = do
   currentTicks <- gets gdCurrentTicks
   let
     sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-    sensors = applySensors (gsAllObjects gs) (playerPosition p) 0.0
+    sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 0.0
     fCollision = sensFLCollision sensors <|> sensFRCollision sensors
     cCollision = sensCLCollision sensors <|> sensCRCollision sensors
-    movingDownwards = ((^. _y) . playerVelocity) p >= 0.0
-    oldPlayerPositionX = ((^. _x) . playerPosition) p
-    oldPlayerPositionY = ((^. _y) . playerPosition) p
-    oldPlayerVelocityX = ((^. _x)  . playerVelocity) p
-    oldPlayerVelocityY = ((^. _y) . playerVelocity) p
+    movingDownwards = p ^. playerVelocity . _y >= 0.0
+    oldPlayerPositionX = p ^. playerPosition . _x
+    oldPlayerPositionY = p ^. playerPosition . _y
+    oldPlayerVelocityX = p ^. playerVelocity . _x
+    oldPlayerVelocityY = p ^. playerVelocity . _y
     playerIsAboveBox b = case b of
-      (ObjectBox (Box r _ _)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
+      (ObjectBox (Box r _ _)) -> oldPlayerPositionY - gcPlayerHeight < (r ^. bottom)
       _ -> False
     playerIsBelowBox b = case b of
-      (ObjectBox (Box r _ _)) -> oldPlayerPositionY + gcPlayerHeight > top r
+      (ObjectBox (Box r _ _)) -> oldPlayerPositionY + gcPlayerHeight > (r ^. top)
       _ -> False
     -- Ist der naechste Zustand der Bodenzustand?
     newPlayerMode = case fCollision of
@@ -195,16 +197,16 @@ processAirPlayerObject gs ias p = do
       _ -> Air
     dirt =
       if newPlayerMode == Ground
-      then [ObjectParticle (Particle "dirt" (playerPosition p) currentTicks)]
+      then [ObjectParticle (Particle "dirt" (p ^. playerPosition) currentTicks)]
       else []
     newPlayerPositionX = case sensWCollision sensors of
-      Just (ObjectBox (Box r _ _)) -> if ((^. _x) . center) r < oldPlayerPositionX
-                                 then right r + gcWSSize + 1.0
-                                 else left r - (gcWSSize + 1.0)
+      Just (ObjectBox (Box r _ _)) -> if r ^. center . _x < oldPlayerPositionX
+                                 then r ^. right  + gcWSSize + 1.0
+                                 else r ^. left - (gcWSSize + 1.0)
       _ -> oldPlayerPositionX + toSeconds t * oldPlayerVelocityX
     newPlayerPositionY = case cCollision of
       Just b@(ObjectBox (Box r _ _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
-                                    then bottom r + gcPlayerHeight
+                                    then r ^. bottom + gcPlayerHeight
                                     else oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
       _ -> oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
     playerAcc
@@ -224,9 +226,9 @@ processAirPlayerObject gs ias p = do
                  then xv * 0.9685
                  else xv
     np = Player {
-      playerPosition = V2 newPlayerPositionX newPlayerPositionY,
-      playerMode = newPlayerMode,
-      playerVelocity = V2 newPlayerVelocityX newPlayerVelocityY,
-      playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
+      _playerPosition = V2 newPlayerPositionX newPlayerPositionY,
+      _playerMode = newPlayerMode,
+      _playerVelocity = V2 newPlayerVelocityX newPlayerVelocityY,
+      _playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
       }
   return (np,dirt <> sensorLines,[])

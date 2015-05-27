@@ -45,7 +45,7 @@ showPlatforms r = showPlatforms' (replicate h (replicate w '0'))
   where showPlatforms' :: [String] -> [Platform] -> [String]
         showPlatforms' s (Platform (V2  x0 y0) (V2  x1 _):ps) = showPlatforms' (replaceNth s y0 (setPartList (safeSearch s y0{-(s !! y0)-}) (x0,x1+1) '1')) ps
         showPlatforms' s [] = s
-        (V2  w h) = dimensions r
+        (V2  w h) = r ^. dimensions
 
 showPlatformsPpm :: RectInt -> [Platform] -> String
 showPlatformsPpm r@(Rect _ (V2  w h)) ps = unlines $ ["P1",show w ++ " " ++ show h] ++ reverse (intersperse ' ' <$> showPlatforms r ps)

@@ -1,9 +1,10 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Jumpie.GameObject(
   GameObject(..),
   PlayerMode(..),
   BoxType(..),
-  Player(Player),
+  Player(..),
   SensorLine(SensorLine),
   Particle(..),
   MoveableObject(..),
@@ -13,6 +14,10 @@ module Jumpie.GameObject(
   playerMode,
   playerVelocity,
   playerWalkSince,
+  boxPosition,
+  boxDeadline,
+  particleInception,
+  particleIdentifier,
   Box(..),
   isBox,
   isParticle,
@@ -26,6 +31,8 @@ import           Jumpie.Types                (PointReal, RectReal)
 import Wrench.Time
 import ClassyPrelude hiding(Real)
 import Wrench.AnimId
+import Control.Lens.TH
+import Control.Lens((&),(+~),(%~))
 
 data PlayerMode = Ground | Air deriving(Eq,Show)
 
@@ -33,25 +40,59 @@ class MoveableObject p where
   moveObject :: p -> PointReal -> p
 
 data Player = Player {
-    playerPosition  :: PointReal
-  , playerMode      :: PlayerMode
-  , playerVelocity  :: PointReal
-  , playerWalkSince :: Maybe TimeTicks
+    _playerPosition  :: PointReal
+  , _playerMode      :: PlayerMode
+  , _playerVelocity  :: PointReal
+  , _playerWalkSince :: Maybe TimeTicks
   } deriving(Show)
 
+$(makeClassy ''Player)
+
 instance MoveableObject Player where
-  moveObject p v = p { playerPosition = playerPosition p + v }
+  moveObject p v = p & playerPosition +~ v
 
 data Particle =
        Particle
-         { particleIdentifier :: AnimId
-         , particlePosition :: PointReal
-         , particleInception :: TimeTicks
+         { _particleIdentifier :: AnimId
+         , _particlePosition :: PointReal
+         , _particleInception :: TimeTicks
          }
   deriving Show
 
+$(makeClassy ''Particle)
+
 instance MoveableObject Particle where
-  moveObject p v = p { particlePosition = particlePosition p + v }
+  moveObject p v = p & particlePosition +~ v
+
+newtype SensorLine = SensorLine { line :: LineSegment PointReal }
+  deriving Show
+
+data BoxType = BoxLeft
+             | BoxRight
+             | BoxSingleton
+             | BoxMiddle
+  deriving Show
+
+data Box = Box {
+    _boxPosition :: RectReal
+  , _boxDeadline :: TimeTicks
+  , _boxType :: BoxType
+  }
+  deriving Show
+
+$(makeClassy ''Box)
+
+instance MoveableObject Box where
+  moveObject p v = p & boxPosition %~ (\o -> moveObject o v)
+
+instance MoveableObject RectReal where
+  moveObject p v = p & rectTopLeft +~ v & rectBottomRight +~ v
+
+instance MoveableObject (LineSegment PointReal) where
+  moveObject p v = p & lineSegmentFrom +~ v & lineSegmentTo +~ v
+
+instance MoveableObject SensorLine where
+  moveObject p v = SensorLine (moveObject (line p) v)
 
 data GameObject = ObjectPlayer Player
                 | ObjectBox Box
@@ -84,31 +125,3 @@ isSensorLine _ = False
 isParticle :: GameObject -> Bool
 isParticle (ObjectParticle _) = True
 isParticle _ = False
-
-data BoxType = BoxLeft
-             | BoxRight
-             | BoxSingleton
-             | BoxMiddle
-  deriving Show
-
-data Box = Box {
-    boxPosition :: RectReal
-  , boxDeadline :: TimeTicks
-  , boxType :: BoxType
-  }
-  deriving Show
-
-instance MoveableObject Box where
-  moveObject p v = p { boxPosition = moveObject (boxPosition p) v }
-
-instance MoveableObject RectReal where
-  moveObject p v = Rect { rectTopLeft = rectTopLeft p + v,rectBottomRight = rectBottomRight p + v }
-
-newtype SensorLine = SensorLine { line :: LineSegment PointReal }
-  deriving Show
-
-instance MoveableObject (LineSegment PointReal) where
-  moveObject p v = LineSegment (lineSegmentFrom p + v) (lineSegmentTo p + v)
-
-instance MoveableObject SensorLine where
-  moveObject p v = SensorLine (moveObject (line p) v)

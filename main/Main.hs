@@ -36,7 +36,7 @@ stageMainLoop gameState = do
     events <- pollEvents
     updateTicks
     updateKeydowns events
-    if outerGameOver events || gsGameOver gameState
+    if outerGameOver events || (gameState ^. gsGameOver)
         then return gameState
         else do
             gameData <- get
@@ -44,11 +44,11 @@ stageMainLoop gameState = do
             (newPlayer,newCameraPosition,newTempSection,newSections,_) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
-                    { gsPlayer = newPlayer
-                    , gsGameOver = testGameOver gameState
-                    , gsSections = newSections
-                    , gsTempSection = newTempSection
-                    , gsCameraPosition = updateCameraPosition newCameraPosition (playerPosition newPlayer)
+                    { _gsPlayer = newPlayer
+                    , _gsGameOver = testGameOver gameState
+                    , _gsSections = newSections
+                    , _gsTempSection = newTempSection
+                    , _gsCameraPosition = updateCameraPosition newCameraPosition (newPlayer ^. playerPosition)
                     }
             render =<< picturizeGameState gameState
             stageMainLoop newState
@@ -89,7 +89,7 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     let
       gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
       (player,sections) = evalRand (generateGame ticks) g
-      initialGameState = GameState { gsPlayer = player,gsSections = sections, gsTempSection = [], gsGameOver = False,gsCameraPosition = V2 0 0 }
+      initialGameState = GameState { _gsPlayer = player,_gsSections = sections, _gsTempSection = [], _gsGameOver = False,_gsCameraPosition = V2 0 0 }
     (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()
