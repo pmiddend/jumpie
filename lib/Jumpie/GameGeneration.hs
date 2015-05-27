@@ -2,7 +2,9 @@
 
 module Jumpie.GameGeneration(
     generateGame
-  , randomAbovePlatPosition
+  , generateSection
+  , moveSection
+  , sectionWidth
   , WorldSection
   ) where
 
@@ -12,13 +14,13 @@ import           Control.Monad.Writer.Strict       (runWriterT)
 import           Jumpie.GameObject
 import qualified Jumpie.LevelGeneration as LG
 import           Jumpie.Geometry.Rect
-import           Jumpie.Random          (randomElemM)
 import           Jumpie.Types
 --import Jumpie.Debug(traceShowId)
 import           Control.Monad.Random   (MonadRandom)
 import ClassyPrelude hiding(head,minimum,maximum,Real)
 import           Jumpie.LevelGeneration (Platform (Platform), pTiles)
 import Linear.V2
+import Wrench.Time
 import Control.Lens((^.))
 import Data.List(head,minimum,maximum)
 
@@ -51,9 +53,9 @@ tilesPerScreen = V2 (screenWidth `div` gcTileSize) (screenHeight `div` gcTileSiz
 --tilesRect :: RectInt
 --tilesRect = Rect (V2 1 1) (V2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1))
 
-platToBoxes :: [PointInt] -> Platform -> [Box]
-platToBoxes plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
-  where toBox x = Box (bpos x) (btype x)
+platToBoxes :: TimeTicks -> [PointInt] -> Platform -> [Box]
+platToBoxes currentTicks plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
+  where toBox x = Box (bpos x) (currentTicks `plusDuration` (fromSeconds 10)) (btype x)
         bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (V2 x y) (V2 (x+1) (y+1)))
         btype x
           | hasLeft && hasRight = BoxMiddle
@@ -66,11 +68,6 @@ platToBoxes plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
 abovePlatPosition :: Box -> PointReal
 abovePlatPosition = (+ (V2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition
 
-randomAbovePlatPosition :: MonadRandom m => [GameObject] -> m PointReal
-randomAbovePlatPosition xs = do
-  randomBox <- randomElemM (mapMaybe maybeBox xs)
-  return (abovePlatPosition randomBox)
-
 {-
 randomStar :: MonadRandom m => TimeTicks -> [GameObject] -> m Star
 randomStar ticks xs = do
@@ -80,14 +77,14 @@ randomStar ticks xs = do
 
 type WorldSection = [GameObject]
 
-generateSection :: MonadRandom m => m WorldSection
-generateSection = do
+generateSection :: MonadRandom m => TimeTicks -> m WorldSection
+generateSection timeTicks = do
   let
     platsAction = LG.iterateNewPlatforms 10 (0,tilesPerScreen ^. _y) gcPlatMaxLength
   (plats,_) <- runWriterT platsAction
   let
     platformPoints = platsToPoints plats
-    boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
+    boxes = ObjectBox <$> concatMap (platToBoxes timeTicks platformPoints) plats
   return boxes
 
 sectionWidth :: WorldSection -> (Real,Real)
@@ -97,12 +94,12 @@ sectionWidth objects =
       maxPos = maximum (((^. _x) . rectBottomRight) <$> boxes)
   in (minPos,maxPos)
 
-moveSection :: WorldSection -> Real -> WorldSection
-moveSection s r = (\o -> moveObject o (V2 r 0)) <$> s
+moveSection :: Real -> WorldSection -> WorldSection
+moveSection r s = (\o -> moveObject o (V2 r 0)) <$> s
 
-generateGame :: MonadRandom m => m (Player,[WorldSection])
-generateGame = do
-  section <- generateSection
+generateGame :: MonadRandom m => TimeTicks -> m (Player,[WorldSection])
+generateGame currentTicks = do
+  section <- generateSection currentTicks
   let
     firstBox = head (sortBy (comparing ((^. _x). rectTopLeft . boxPosition)) (mapMaybe maybeBox section))
     rawPlayerPos = abovePlatPosition firstBox
@@ -113,6 +110,6 @@ generateGame = do
         playerVelocity = V2 0.0 0.0,
         playerWalkSince = Nothing
       }
-  secondSection <- generateSection
+  secondSection <- generateSection (currentTicks `plusDuration` fromSeconds 20)
   let (_,firstSectionEnd) = sectionWidth section
-  return (player,[section,(moveSection secondSection (firstSectionEnd + (fromIntegral gcTileSize)))])
+  return (player,[section,(moveSection (firstSectionEnd + (fromIntegral gcTileSize)) secondSection)])

@@ -40,7 +40,7 @@ picturizeObject ob = case ob of
   ObjectParticle s -> picturizeParticle s
 
 picturizeBox :: Box -> GameDataM p Picture
-picturizeBox (Box p t) = return (rectTopLeft p `pictureTranslated` pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t))
+picturizeBox (Box p _ t) = return (rectTopLeft p `pictureTranslated` pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t))
 
 picturizeParticle :: Particle -> GameDataM p Picture
 picturizeParticle (Particle identifier pos inception) = do

@@ -5,10 +5,7 @@ import           Control.Monad.State.Strict   (gets,get)
 import           Data.Maybe                   (fromJust)
 import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
-import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
-                                               gcGrv, gcJmp, gcPlayerHeight,
-                                               gcPlayerMaxSpeed, 
-                                               gcWSSize, screenHeight)
+import           Jumpie.GameConfig
 import           Jumpie.GameData
 import           Jumpie.GameObject
 import           Jumpie.GameState
@@ -20,16 +17,18 @@ import           Jumpie.Geometry.Utility      (clampAbs)
 import           Jumpie.Maybe                 (ifMaybe)
 import           Jumpie.Types                 (IncomingAction (..),
                                                LineSegmentReal, PointReal, Real,OutgoingAction(..))
-import ClassyPrelude hiding(Real,head)
+import ClassyPrelude hiding(Real,head,last)
 import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.))
 import Wrench.Animation
-import Data.List(tail,head)
+import Data.List(tail,head,last)
 
-processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,[WorldSection],[OutgoingAction])
+processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,WorldSection,[WorldSection],[OutgoingAction])
 processGameObjects gs actions = do
   -- [(WorldSection,[OutgoingAction])]
   sectionsWithActions <- traverse (processWorldSection gs actions) (gsSections gs)
+  (newTempSection,tempSectionActions) <- processWorldSection gs actions (gsTempSection gs)
+  ticks <- gets gdCurrentTicks
   let
     sections = fst <$> sectionsWithActions
     secActions = join (snd <$> sectionsWithActions)
@@ -37,7 +36,22 @@ processGameObjects gs actions = do
   let
     firstSection = head sections
     tailSections = tail sections
-  return (newPlayer,(firstSection <> playerObjects) : tailSections,playerActions <> secActions)
+    totalActions = tempSectionActions <> playerActions <> secActions
+  case firstSection of
+    [] -> do
+      putStrLn "Generating new section"
+      let
+        newFirstSection = head tailSections
+        lastSection = last tailSections
+        (newFirstSectionStart,_) = sectionWidth newFirstSection
+        (_,lastSectionEnd) = sectionWidth lastSection
+        newTempSectionMoved = moveSection newFirstSectionStart newTempSection
+        movedTails = (moveSection newFirstSectionStart) <$> tailSections
+      newSection <- moveSection (lastSectionEnd-newFirstSectionStart+fromIntegral gcTileSize) <$> (generateSection ticks)
+      return (newPlayer,newTempSectionMoved,(movedTails ++ [newSection]),totalActions)
+    xs -> do
+      return (newPlayer,newTempSection <> playerObjects,xs : tailSections,totalActions)
+  
 
 processWorldSection :: GameState -> [IncomingAction] -> WorldSection -> GameDataM p (WorldSection,[OutgoingAction])
 processWorldSection gs actions section = do
@@ -49,7 +63,11 @@ processWorldSection gs actions section = do
 processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM p ([GameObject],[OutgoingAction])
 processGameObject gs _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
-  ObjectBox b -> return ([ObjectBox b],[])
+  ObjectBox b -> do
+    ticks <- gets gdCurrentTicks
+    if ticks > boxDeadline b
+      then return ([],[])
+      else return ([ObjectBox b],[])
   ObjectParticle b -> processParticle gs b
   ObjectSensorLine _ -> return ([],[])
 
@@ -122,12 +140,12 @@ processGroundPlayerObject gs ias p = do
                         then Air
                         else Ground
         newPlayerPositionX = case sensWCollision sensors of
-          Just (ObjectBox (Box r _)) -> if ((^. _x) . center) r < ((^. _x) . playerPosition) p
+          Just (ObjectBox (Box r _ _)) -> if ((^. _x) . center) r < ((^. _x) . playerPosition) p
                                      then right r + gcWSSize + 1.0
                                      else left r - (gcWSSize + 1.0)
           _ -> ((^. _x) . playerPosition) p + toSeconds t * ((^. _x) . playerVelocity) p
         newPlayerPositionY = case fCollision of
-          Just (ObjectBox (Box r _)) -> top r - gcPlayerHeight
+          Just (ObjectBox (Box r _ _)) -> top r - gcPlayerHeight
           _ -> ((^. _y) . playerPosition) p
         newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
         oldPlayerVelocityX = ((^. _x)  . playerVelocity) p
@@ -164,10 +182,10 @@ processAirPlayerObject gs ias p = do
     oldPlayerVelocityX = ((^. _x)  . playerVelocity) p
     oldPlayerVelocityY = ((^. _y) . playerVelocity) p
     playerIsAboveBox b = case b of
-      (ObjectBox (Box r _)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
+      (ObjectBox (Box r _ _)) -> oldPlayerPositionY - gcPlayerHeight < bottom r
       _ -> False
     playerIsBelowBox b = case b of
-      (ObjectBox (Box r _)) -> oldPlayerPositionY + gcPlayerHeight > top r
+      (ObjectBox (Box r _ _)) -> oldPlayerPositionY + gcPlayerHeight > top r
       _ -> False
     -- Ist der naechste Zustand der Bodenzustand?
     newPlayerMode = case fCollision of
@@ -180,12 +198,12 @@ processAirPlayerObject gs ias p = do
       then [ObjectParticle (Particle "dirt" (playerPosition p) currentTicks)]
       else []
     newPlayerPositionX = case sensWCollision sensors of
-      Just (ObjectBox (Box r _)) -> if ((^. _x) . center) r < oldPlayerPositionX
+      Just (ObjectBox (Box r _ _)) -> if ((^. _x) . center) r < oldPlayerPositionX
                                  then right r + gcWSSize + 1.0
                                  else left r - (gcWSSize + 1.0)
       _ -> oldPlayerPositionX + toSeconds t * oldPlayerVelocityX
     newPlayerPositionY = case cCollision of
-      Just b@(ObjectBox (Box r _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
+      Just b@(ObjectBox (Box r _ _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
                                     then bottom r + gcPlayerHeight
                                     else oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
       _ -> oldPlayerPositionY + toSeconds t * oldPlayerVelocityY

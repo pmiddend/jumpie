@@ -4,19 +4,15 @@ module Main where
 import           Control.Monad.State.Strict (get)
 import           System.Random              (getStdGen)
 import           Jumpie.Picturize          (picturizeGameState)
-import           Control.Monad.Random       (evalRand,evalRandT)
-import           Control.Monad.Writer.Strict       (runWriterT)
+import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
 import           Jumpie.Game
 import           Jumpie.GameObject
 import           Jumpie.GameGeneration
-import qualified Jumpie.LevelGeneration as LG
 import Jumpie.GameState
 import Jumpie.GameData
-import Jumpie.Geometry.Rect
 import Jumpie.Types
 import Wrench.Time
-import Wrench.Rectangle
 import qualified Wrench.Keysym as KS
 import Wrench.Engine (withPlatform)
 import Wrench.Event
@@ -45,12 +41,13 @@ stageMainLoop gameState = do
         else do
             gameData <- get
             let incomingActions = concatMap kdToAction (gdKeydowns gameData)
-            (newPlayer,newSections,_) <-
+            (newPlayer,newTempSection,newSections,_) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
                     { gsPlayer = newPlayer
                     , gsGameOver = testGameOver gameState
                     , gsSections = newSections
+                    , gsTempSection = newTempSection
                     , gsCameraPosition = updateCameraPosition (gsCameraPosition gameState) (playerPosition newPlayer)
                     }
             render =<< picturizeGameState gameState
@@ -91,8 +88,8 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     font <- loadFont platform (mediaDir <> "/stdfont.ttf") 15
     let
       gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
-      (player,sections) = evalRand generateGame g
-      initialGameState = GameState { gsPlayer = player,gsSections = sections, gsGameOver = False,gsCameraPosition = V2 0 0 }
+      (player,sections) = evalRand (generateGame ticks) g
+      initialGameState = GameState { gsPlayer = player,gsSections = sections, gsTempSection = [], gsGameOver = False,gsCameraPosition = V2 0 0 }
     (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()

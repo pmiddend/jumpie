@@ -13,9 +13,7 @@ module Jumpie.GameObject(
   playerMode,
   playerVelocity,
   playerWalkSince,
-  Box(Box),
-  boxPosition,
-  boxType,
+  Box(..),
   isBox,
   isParticle,
   isPlayer,
@@ -93,7 +91,11 @@ data BoxType = BoxLeft
              | BoxMiddle
   deriving Show
 
-data Box = Box { boxPosition :: RectReal, boxType :: BoxType }
+data Box = Box {
+    boxPosition :: RectReal
+  , boxDeadline :: TimeTicks
+  , boxType :: BoxType
+  }
   deriving Show
 
 instance MoveableObject Box where
