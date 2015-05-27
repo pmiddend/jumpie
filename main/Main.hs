@@ -41,14 +41,14 @@ stageMainLoop gameState = do
         else do
             gameData <- get
             let incomingActions = concatMap kdToAction (gdKeydowns gameData)
-            (newPlayer,newTempSection,newSections,_) <-
+            (newPlayer,newCameraPosition,newTempSection,newSections,_) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
                     { gsPlayer = newPlayer
                     , gsGameOver = testGameOver gameState
                     , gsSections = newSections
                     , gsTempSection = newTempSection
-                    , gsCameraPosition = updateCameraPosition (gsCameraPosition gameState) (playerPosition newPlayer)
+                    , gsCameraPosition = updateCameraPosition newCameraPosition (playerPosition newPlayer)
                     }
             render =<< picturizeGameState gameState
             stageMainLoop newState

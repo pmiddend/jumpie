@@ -23,7 +23,7 @@ import Control.Lens((^.))
 import Wrench.Animation
 import Data.List(tail,head,last)
 
-processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,WorldSection,[WorldSection],[OutgoingAction])
+processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
 processGameObjects gs actions = do
   -- [(WorldSection,[OutgoingAction])]
   sectionsWithActions <- traverse (processWorldSection gs actions) (gsSections gs)
@@ -48,9 +48,9 @@ processGameObjects gs actions = do
         newTempSectionMoved = moveSection newFirstSectionStart newTempSection
         movedTails = (moveSection newFirstSectionStart) <$> tailSections
       newSection <- moveSection (lastSectionEnd-newFirstSectionStart+fromIntegral gcTileSize) <$> (generateSection ticks)
-      return (newPlayer,newTempSectionMoved,(movedTails ++ [newSection]),totalActions)
+      return (newPlayer,V2 (gsCameraPosition gs ^. _x - newFirstSectionStart) (gsCameraPosition gs ^. _y),newTempSectionMoved,(movedTails ++ [newSection]),totalActions)
     xs -> do
-      return (newPlayer,newTempSection <> playerObjects,xs : tailSections,totalActions)
+      return (newPlayer,gsCameraPosition gs,newTempSection <> playerObjects,xs : tailSections,totalActions)
   
 
 processWorldSection :: GameState -> [IncomingAction] -> WorldSection -> GameDataM p (WorldSection,[OutgoingAction])
