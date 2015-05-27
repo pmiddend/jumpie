@@ -16,11 +16,12 @@ import           Jumpie.Random          (randomElemM)
 import           Jumpie.Types           (PointInt, PointReal, RectInt)
 --import Jumpie.Debug(traceShowId)
 import           Control.Monad.Random   (MonadRandom)
-import ClassyPrelude
+import ClassyPrelude hiding(head)
 import           Jumpie.LevelGeneration (Platform (Platform), pTiles)
 import Wrench.Time
 import Linear.V2
 import Control.Lens((^.))
+import Data.List(head)
 
   {-
 initialPlayer :: Player
@@ -63,10 +64,13 @@ platToBoxes plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
           where hasLeft = V2 (x - 1) y `elem` plats
                 hasRight = V2 (x + 1) y `elem` plats
 
+abovePlatPosition :: Box -> PointReal
+abovePlatPosition = (+ (V2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition
+
 randomAbovePlatPosition :: MonadRandom m => [GameObject] -> m PointReal
 randomAbovePlatPosition xs = do
   randomBox <- randomElemM (mapMaybe maybeBox xs)
-  return . (+ (V2 (fromIntegral gcTileSize / 2) 0)) . rectTopLeft . boxPosition $ randomBox
+  return (abovePlatPosition randomBox)
 
 {-
 randomStar :: MonadRandom m => TimeTicks -> [GameObject] -> m Star
@@ -77,21 +81,17 @@ randomStar ticks xs = do
 
 generateGame :: MonadRandom m => m (Player,[GameObject])
 generateGame = do
-  --plats <- undefined--validPlatforms gcPlatCount easyParabolas (randomPlatform tilesRect gcPlatMaxLength)
   let
-    platsAction = do
-      startPlat <- LG.newLevelGen (0,tilesPerScreen ^. _y) gcPlatMaxLength []
-      nextPlats <- LG.newLevelGen (0,tilesPerScreen ^. _y) gcPlatMaxLength startPlat
-      nextPlats' <- LG.newLevelGen (0,tilesPerScreen ^. _y) gcPlatMaxLength nextPlats
-      nextPlats'' <- LG.newLevelGen (0,tilesPerScreen ^. _y) gcPlatMaxLength nextPlats'
-      return (startPlat <> nextPlats <> nextPlats' <> nextPlats'')
+    platsAction = LG.iterateNewPlatforms 10 (0,tilesPerScreen ^. _y) gcPlatMaxLength
   (plats,_) <- runWriterT platsAction
   let
     platformPoints = platsToPoints plats
     boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
-  rawPlayerPos <- randomAbovePlatPosition boxes
+    firstBox = head (sortBy (comparing ((^. _x). rectTopLeft . boxPosition)) (mapMaybe maybeBox boxes))
+    rawPlayerPos = abovePlatPosition firstBox
+    playerPos = rawPlayerPos + V2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize))
   let player = Player {
-        playerPosition = rawPlayerPos + V2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize)),
+        playerPosition = playerPos,
         playerMode = Air,
         playerVelocity = V2 0.0 0.0,
         playerWalkSince = Nothing

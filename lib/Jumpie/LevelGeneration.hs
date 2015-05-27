@@ -13,23 +13,23 @@ module Jumpie.LevelGeneration(
   playerMaxJumpHeight,
   playerMaxJumpWidth,
   platformManhattanDistance,
+  iterateNewPlatforms,
   newLevelGen) where
 
 --import           Control.Category             ((>>>))
 import           Control.Monad.Random         (MonadRandom, getRandomR)
 import           Jumpie.GameConfig            (gcGrv, gcJmp, gcPlayerMaxSpeed,
-                                               gcTileSize, gcTimeMultiplier)
+                                               gcTileSize)
 --import           Jumpie.Geometry.Intersection (parabolaPointIntersects)
 --import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
-import           Jumpie.Geometry.Parabola     (Parabola (Parabola), paraInvert,paraZenith,paraBounds)
 import           Jumpie.Geometry.Rect(Rect(..),dimensions)
 import Control.Monad.Writer.Class
 import           Jumpie.List                  (orEmptyTrue, replaceNth,
                                                setPartList)
 --import           Jumpie.Tuple                 (both)
 import           Jumpie.Random                 (randomElemM)
-import           Jumpie.Types                 (LineSegmentReal, PointInt,
-                                               PointReal, Real, RectInt)
+import           Jumpie.Types                 (PointInt,
+                                               Real, RectInt)
 import ClassyPrelude hiding(Real,intersect,maximum,(\\))
 import Linear.V2
 import Data.List((!!),maximum,(\\))
@@ -37,6 +37,7 @@ import Control.Lens((^.))
 
 data Platform = Platform PointInt PointInt deriving(Show)
 
+safeSearch :: [String] -> Int -> String
 safeSearch s a = if length s <= a then error "Couldn't: \"" <> show a <> "\"" else s !! a
 
 showPlatforms :: RectInt -> [Platform] -> [String]
@@ -70,6 +71,18 @@ newLevelGen yrange maxLength startPlatforms =
       numberOfPlats <- getRandomR ((2,4) :: (Int,Int))
       tell ["newLevelGen: Number of plats: " <> showText numberOfPlats]
       newPlatforms plats numberOfPlats (rightmost+2,rightmost+4) yrange maxLength
+
+iterateNewPlatforms :: (MonadRandom m, MonadWriter [Text] m) => Int -> (Int, Int) -> Int -> m [Platform]
+iterateNewPlatforms count yrange maxLen = myIterate count (newLevelGen yrange maxLen)
+
+myIterate :: (Semigroup t, Monoid t, Monad m) => Int -> (t -> m t) -> m t
+myIterate count g = f' count mempty
+  where
+    f' 0 _ = return mempty
+    f' c xstart = do
+      r <- g xstart
+      rest <- f' (c-1) r
+      return (r <> rest)
 
 newPlatforms :: (MonadRandom m,MonadWriter [Text] m) => [Platform] -> Int -> (Int,Int) -> (Int,Int) -> Int -> m [Platform]
 newPlatforms previous count' (xl,xr) (miny,maxy) maxLength = newPlatforms' count' [V2 x y | x <- [xl..xr], y <- [miny..maxy]]
@@ -122,12 +135,6 @@ playerMaxJumpHeight = -(gcJmp*gcJmp)/(2*(-gcGrv))
 playerMaxJumpWidth :: Real
 playerMaxJumpWidth = (2*(-gcJmp)*gcPlayerMaxSpeed)/gcGrv
 
-{-
-playerParabola :: Real -> Parabola Real
-playerParabola fmult = Parabola (-gcGrv/(2*f*f),-gcJmp/f,0)
-  where f = fmult * (-1) * (gcPlayerMaxSpeed * gcTimeMultiplier * gcGrv) / gcJmp
--}
-
 pHigher :: Platform -> Platform -> Bool
 pHigher p1 p2 = pHeight p1 > pHeight p2
 
@@ -158,46 +165,6 @@ platformManhattanDistance p1 p2 =
     y = abs (pHeight p1 - pHeight p2)
   in V2 x y
 
-{-
-
-validPlatforms :: MonadRandom m => Int -> [Parabola Real] -> m Platform -> m [Platform]
-validPlatforms ma paras randPlat = validPlatforms' ma paras randPlat []
-
-validPlatforms' :: MonadRandom m => Int -> [Parabola Real] -> m Platform -> [Platform] -> m [Platform]
-validPlatforms' ma paras randPlat ns | length ns == ma = return ns
-                                      | otherwise = do
-                                        x <- randPlat
-                                        if not (intersects ns x) && not (unreachable paras ns x)
-                                          then validPlatforms' ma paras randPlat (x:ns)
-                                          else validPlatforms' ma paras randPlat ns
-  where intersects :: [Platform] -> Platform -> Bool
-        intersects ps p = or r
-          where r = pure (pIntersects p) <*> ps
-
-randomPlatform :: MonadRandom m => RectInt -> Int -> m Platform
-randomPlatform (Rect (V2  left top) (V2  right bottom)) maxLength = do
-  pleft <- getRandomR (left,right)
-  pright <- getRandomR (pleft,min right (pleft+maxLength))
-  ptop <- getRandomR (top,bottom)
-  return $ Platform (V2 pleft ptop) (V2 pright ptop)
-
--- Neu
-randomPlatforms :: MonadRandom m => RectInt -> Int -> m [Platform]
-randomPlatforms rect maxLength = do
-  p <- randomPlatform rect maxLength
-  ps <- randomPlatforms rect maxLength
-  return $ p : ps
-
--}
-{-
--- Schneiden sich zwei Plattformen
-pIntersects :: Platform -> Platform -> Bool
---pIntersects p0 p1 = trace (show p0 ++ " intersects " ++ show p1 ++ " = " ++ show r) $ r
-pIntersects p0 p1 = r
-  where r = not $ null $ pAugTiles p0 `intersect` pTiles p1
---  t0 == t1 && (l1 `between` (l0,r0) || r1 `between` (l0,r0) || l0 `between` (l1,r1) || r0 `between` (l1,r1))
--}
-
 pTiles :: Platform -> [PointInt]
 pTiles (Platform (V2  l0 t0) (V2  r0 _)) = [V2  x t0 | x <- [l0..r0]]
 
@@ -209,38 +176,3 @@ pHeight (Platform (V2 _ y) _) = y
 
 pRight :: Platform -> PointInt
 pRight (Platform _ r) = r
-
-{-
-pAugTiles :: Platform -> [PointInt]
-pAugTiles (Platform (V2  l t) (V2  r _)) = concatMap pTiles $ makePlat <$> [(wl,wr,t-1),(wl,wr,t),(wl,wr,t+1)]
-  where wl = l-1
-        wr = r+1
-        makePlat (l0,r0,y0) = Platform (V2  l0 y0) (V2  r0 y0)
-
--- Plattform zu Linie
-pToLineSegment :: Platform -> LineSegmentReal
-pToLineSegment (Platform (V2  x0 y0) (V2  x1 _)) = (fmap . fmap) fromIntegral (LineSegment (V2  x0 y0) (V2  x1 y0))
--}
-
-{-
--- Ist Plattform A von Plattform B erreichbar
-pReachable :: [Parabola Real] -> Platform -> Platform -> Bool
-pReachable paras p0@(Platform (V2  _ t0) _) p1@(Platform (V2  _ t1) _) =
-  pReachable' paras `uncurry` both (pToLineSegment >>> appTS) lowerPair
-  where lowerPair = if t0 <= t1 then (p0,p1) else (p1,p0)
-        appTS = (fmap . fmap) (*fromIntegral gcTileSize)
-
--- Ist Plattform A von Plattform B erreichbar (basiert auf Linien, nicht mehr auf Plattformen)
-pReachable' :: [Parabola Real] -> LineSegmentReal -> LineSegmentReal -> Bool
-pReachable' paras (LineSegment l0 r0) upper = pParabolaIntersects paras l0 upper || pParabolaIntersects paras r0 upper
-
-pParabolaIntersects :: [Parabola Real] -> PointReal -> LineSegmentReal -> Bool
-pParabolaIntersects paras p (LineSegment l r) = or $ parabolaPointIntersects <$> paras <*> [l - p,r - p]
-
-easyParabolas :: [Parabola Real]
-easyParabolas = concatMap (\f -> [playerParabola f,paraInvert (playerParabola f)]) [1.0,0.95..0.05]
-
-difficultParabolas :: [Parabola Real]
-difficultParabolas = concatMap (\f -> [playerParabola f,paraInvert (playerParabola f)]) [1.0]
-
--}
