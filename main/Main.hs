@@ -45,12 +45,12 @@ stageMainLoop gameState = do
         else do
             gameData <- get
             let incomingActions = concatMap kdToAction (gdKeydowns gameData)
-            (newPlayer,newObjects,_) <-
+            (newPlayer,newSections,_) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
                     { gsPlayer = newPlayer
                     , gsGameOver = testGameOver gameState
-                    , gsObjects = newObjects
+                    , gsSections = newSections
                     , gsCameraPosition = updateCameraPosition (gsCameraPosition gameState) (playerPosition newPlayer)
                     }
             render =<< picturizeGameState gameState
@@ -91,8 +91,8 @@ main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
     font <- loadFont platform (mediaDir <> "/stdfont.ttf") 15
     let
       gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
-      (player,objects) = evalRand generateGame g
-      initialGameState = GameState { gsPlayer = player,gsObjects = objects, gsGameOver = False,gsCameraPosition = V2 0 0 }
+      (player,sections) = evalRand generateGame g
+      initialGameState = GameState { gsPlayer = player,gsSections = sections, gsGameOver = False,gsCameraPosition = V2 0 0 }
     (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
     _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
     return ()

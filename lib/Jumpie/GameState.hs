@@ -3,19 +3,20 @@ module Jumpie.GameState(
   , gsAllObjects
   ) where
 
-import           Jumpie.GameObject (GameObject(..),Player)
+import           Jumpie.GameObject
+import           Jumpie.GameGeneration
 import ClassyPrelude
 import Jumpie.Types
 
 data GameState = GameState {
-    gsObjects :: [GameObject]
+    gsSections :: [WorldSection]
   , gsPlayer :: Player
   , gsGameOver :: Bool
   , gsCameraPosition :: PointReal
   }
 
 gsAllObjects :: GameState -> [GameObject]
-gsAllObjects gs = gsPlayerPacked gs : gsObjects gs
+gsAllObjects gs = gsPlayerPacked gs : join (gsSections gs)
 
 gsPlayerPacked :: GameState -> GameObject
 gsPlayerPacked = ObjectPlayer . gsPlayer

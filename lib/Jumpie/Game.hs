@@ -11,7 +11,8 @@ import           Jumpie.GameConfig            (gcAcc, gcAir, gcDec, gcFrc,
                                                gcWSSize, screenHeight)
 import           Jumpie.GameData
 import           Jumpie.GameObject
-import           Jumpie.GameState             (GameState, gsObjects,gsPlayer)
+import           Jumpie.GameState
+import           Jumpie.GameGeneration
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
 import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
 import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
@@ -19,21 +20,31 @@ import           Jumpie.Geometry.Utility      (clampAbs)
 import           Jumpie.Maybe                 (ifMaybe)
 import           Jumpie.Types                 (IncomingAction (..),
                                                LineSegmentReal, PointReal, Real,OutgoingAction(..))
-import ClassyPrelude hiding(Real)
+import ClassyPrelude hiding(Real,head)
 import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.))
 import Wrench.Animation
+import Data.List(tail,head)
 
-processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,[GameObject],[OutgoingAction])
+processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,[WorldSection],[OutgoingAction])
 processGameObjects gs actions = do
-  objectsnactions <- traverse (processGameObject gs actions) (gsObjects gs)
+  -- [(WorldSection,[OutgoingAction])]
+  sectionsWithActions <- traverse (processWorldSection gs actions) (gsSections gs)
+  let
+    sections = fst <$> sectionsWithActions
+    secActions = join (snd <$> sectionsWithActions)
   (newPlayer,playerObjects,playerActions) <- processPlayerObject gs actions (gsPlayer gs) 
   let
-    (newObjects,objectActions) = bimap concat concat . unzip $ objectsnactions
-  return (newPlayer,playerObjects <> newObjects,playerActions <> objectActions)
+    firstSection = head sections
+    tailSections = tail sections
+  return (newPlayer,(firstSection <> playerObjects) : tailSections,playerActions <> secActions)
 
-testGameOver :: GameState -> Bool
-testGameOver os = ((^. _y) . playerPosition) (gsPlayer os) > fromIntegral screenHeight
+processWorldSection :: GameState -> [IncomingAction] -> WorldSection -> GameDataM p (WorldSection,[OutgoingAction])
+processWorldSection gs actions section = do
+  objectsnactions <- traverse (processGameObject gs actions) section
+  let
+    (newObjects,objectActions) = bimap concat concat . unzip $ objectsnactions
+  return (newObjects,objectActions)
 
 processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM p ([GameObject],[OutgoingAction])
 processGameObject gs _ o = case o of
@@ -41,6 +52,9 @@ processGameObject gs _ o = case o of
   ObjectBox b -> return ([ObjectBox b],[])
   ObjectParticle b -> processParticle gs b
   ObjectSensorLine _ -> return ([],[])
+
+testGameOver :: GameState -> Bool
+testGameOver os = ((^. _y) . playerPosition) (gsPlayer os) > fromIntegral screenHeight
 
 processParticle :: GameState -> Particle -> GameDataM p ([GameObject],[OutgoingAction])
 processParticle _ b = do
@@ -102,7 +116,7 @@ processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameData
 processGroundPlayerObject gs ias p = do
   t <- gets gdTimeDelta
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-        sensors = applySensors (gsObjects gs) (playerPosition p) 4.0
+        sensors = applySensors (gsAllObjects gs) (playerPosition p) 4.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
         newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
                         then Air
@@ -141,7 +155,7 @@ processAirPlayerObject gs ias p = do
   currentTicks <- gets gdCurrentTicks
   let
     sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
-    sensors = applySensors (gsObjects gs) (playerPosition p) 0.0
+    sensors = applySensors (gsAllObjects gs) (playerPosition p) 0.0
     fCollision = sensFLCollision sensors <|> sensFRCollision sensors
     cCollision = sensCLCollision sensors <|> sensCRCollision sensors
     movingDownwards = ((^. _y) . playerVelocity) p >= 0.0
