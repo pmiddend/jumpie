@@ -41,6 +41,7 @@ import           Jumpie.Types               (Keydowns)
 import ClassyPrelude
 import           Data.Map.Strict             ((!))
 
+{-
 class Monad (g p) => Game g p where
   gupdateKeydowns :: [Event] -> g p ()
   gupdateTicks :: g p ()
@@ -54,6 +55,7 @@ class Monad (g p) => Game g p where
   grender :: Picture -> g p ()
   glookupAnim :: AnimId -> g p Animation
   glookupSurface :: P.Platform p => ImageId -> g p (SurfaceData (P.PlatformImage p))
+-}
 
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (P.PlatformImage p)
@@ -85,6 +87,7 @@ newtype GameDataM p a = GameDataM {
   runGameData :: RandT StdGen (GameDataBaseM p) a
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
 
+{-           
 instance Game GameDataM where
   gupdateKeydowns = undefined
   gupdateTicks = undefined
@@ -98,7 +101,7 @@ instance Game GameDataM where
   grender = undefined
   glookupAnim = undefined
   glookupSurface = undefined
-  
+-}
 
 currentTicks :: GameDataM p TimeTicks
 currentTicks = gets gdCurrentTicks
