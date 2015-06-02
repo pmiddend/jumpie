@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Jumpie.GameData(
     GameData
@@ -40,6 +41,20 @@ import           Jumpie.Types               (Keydowns)
 import ClassyPrelude
 import           Data.Map.Strict             ((!))
 
+class Monad (g p) => Game g p where
+  gupdateKeydowns :: [Event] -> g p ()
+  gupdateTicks :: g p ()
+  gcurrentTicks :: g p TimeTicks
+  gcurrentTimeDelta :: g p TimeDelta
+  gcurrentKeydowns :: g p Keydowns
+  grenderBegin :: g p ()
+  grenderFinish :: g p ()
+  grenderSprites :: P.Platform p => [P.SpriteInstance (P.PlatformImage p)] -> g p ()
+  grenderClear :: g p ()
+  grender :: Picture -> g p ()
+  glookupAnim :: AnimId -> g p Animation
+  glookupSurface :: P.Platform p => ImageId -> g p (SurfaceData (P.PlatformImage p))
+
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (P.PlatformImage p)
   , gdAnims        :: AnimMap
@@ -69,6 +84,21 @@ type GameDataBaseM p = StateT (GameData p) IO
 newtype GameDataM p a = GameDataM {
   runGameData :: RandT StdGen (GameDataBaseM p) a
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
+
+instance Game GameDataM where
+  gupdateKeydowns = undefined
+  gupdateTicks = undefined
+  gcurrentTicks = undefined
+  gcurrentTimeDelta = undefined
+  gcurrentKeydowns = undefined
+  grenderBegin = undefined
+  grenderFinish = undefined
+  grenderSprites = undefined
+  grenderClear = undefined
+  grender = undefined
+  glookupAnim = undefined
+  glookupSurface = undefined
+  
 
 currentTicks :: GameDataM p TimeTicks
 currentTicks = gets gdCurrentTicks
