@@ -1,7 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Jumpie.Game(processGameObjects,testGameOver) where
 
-import           Control.Monad.State.Strict   (gets,get)
 import           Data.Maybe                   (fromJust)
 import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
@@ -29,7 +28,7 @@ processGameObjects gs actions = do
   -- [(WorldSection,[OutgoingAction])]
   sectionsWithActions <- traverse (processWorldSection gs actions) (gs ^. gsSections)
   (newTempSection,tempSectionActions) <- processWorldSection gs actions (gs ^. gsTempSection)
-  ticks <- gets gdCurrentTicks
+  ticks <- currentTicks
   let
     sections = view _1 <$> sectionsWithActions
     secActions = join ((view _2) <$> sectionsWithActions)
@@ -66,7 +65,7 @@ processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM p 
 processGameObject gs _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
   ObjectBox b -> do
-    ticks <- gets gdCurrentTicks
+    ticks <- currentTicks
     if ticks > b ^. boxDeadline
       then return ([],[])
       else return ([ObjectBox b],[])
@@ -78,9 +77,9 @@ testGameOver os = (os ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screen
 
 processParticle :: GameState -> Particle -> GameDataM p ([GameObject],[OutgoingAction])
 processParticle _ b = do
-  currentTicks <- gets gdCurrentTicks
-  gd <- get
-  if (b ^. particleInception) `plusDuration` ((lookupAnimSafe gd (b ^. particleIdentifier)) ^. animLifetime)  < currentTicks
+  currentTicks' <- currentTicks
+  anim <- lookupAnimSafe (b ^. particleIdentifier)
+  if (b ^. particleInception) `plusDuration` (anim ^. animLifetime)  < currentTicks'
     then return ([],[])
     else return ([ObjectParticle b],[])
 
@@ -134,7 +133,7 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
 
 processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
 processGroundPlayerObject gs ias p = do
-  t <- gets gdTimeDelta
+  t <- currentTimeDelta
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
         sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 4.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
@@ -171,8 +170,8 @@ processGroundPlayerObject gs ias p = do
 
 processAirPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
 processAirPlayerObject gs ias p = do
-  t <- gets gdTimeDelta
-  currentTicks <- gets gdCurrentTicks
+  t <- currentTimeDelta
+  currentTicks' <- currentTicks
   let
     sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
     sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 0.0
@@ -197,7 +196,7 @@ processAirPlayerObject gs ias p = do
       _ -> Air
     dirt =
       if newPlayerMode == Ground
-      then [ObjectParticle (Particle "dirt" (p ^. playerPosition) currentTicks)]
+      then [ObjectParticle (Particle "dirt" (p ^. playerPosition) currentTicks')]
       else []
     newPlayerPositionX = case sensWCollision sensors of
       Just (ObjectBox (Box r _ _)) -> if r ^. center . _x < oldPlayerPositionX
@@ -229,6 +228,6 @@ processAirPlayerObject gs ias p = do
       _playerPosition = V2 newPlayerPositionX newPlayerPositionY,
       _playerMode = newPlayerMode,
       _playerVelocity = V2 newPlayerVelocityX newPlayerVelocityY,
-      _playerWalkSince = if newPlayerMode == Ground then Just currentTicks else Nothing
+      _playerWalkSince = if newPlayerMode == Ground then Just currentTicks' else Nothing
       }
   return (np,dirt <> sensorLines,[])

@@ -1,9 +1,12 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Jumpie.GameData(
-    GameData(..)
+    GameData
   , updateKeydowns
   , updateTicks
+  , currentTicks
+  , currentTimeDelta
+  , currentKeydowns
   , GameDataM
   , runGame
   , pollEvents
@@ -17,16 +20,15 @@ module Jumpie.GameData(
   ) where
 
 import qualified Data.Set as S
-import           Control.Monad.State.Strict (StateT, get, gets, put, runStateT,MonadState)
+import           Control.Monad.State.Strict (StateT, get, gets, put, evalStateT,MonadState)
 
-
-import           Jumpie.GameConfig          (gcTimeMultiplier)
 
 import           Control.Monad.Random       (RandT, evalRandT,MonadRandom)
-import           System.Random              (StdGen)
+import           System.Random              (StdGen,getStdGen)
 import qualified Wrench.Platform as P
 import Wrench.Time
 import Wrench.Picture
+import Jumpie.GameConfig
 import Wrench.Engine
 import Wrench.ImageData
 import Wrench.Color
@@ -48,17 +50,34 @@ data GameData p = GameData {
   , gdFont         :: P.PlatformFont p
   }
 
-lookupAnimSafe :: GameData p -> AnimId -> Animation
-lookupAnimSafe gd aid = gdAnims gd ! aid
+--lookupAnimSafe :: GameData p -> AnimId -> Animation
+--lookupAnimSafe gd aid = gdAnims gd ! aid
+lookupAnimSafe :: AnimId -> GameDataM p Animation
+lookupAnimSafe aid = do
+  anims <- gets gdAnims
+  return (anims ! aid)
 
-lookupSurfaceSafe :: Platform p => GameData p -> ImageId -> SurfaceData (P.PlatformImage p)
-lookupSurfaceSafe gd sid = gdSurfaces gd ! sid
+--lookupSurfaceSafe :: Platform p => GameData p -> ImageId -> SurfaceData (P.PlatformImage p)
+--lookupSurfaceSafe gd sid = gdSurfaces gd ! sid
+lookupSurfaceSafe :: Platform p => ImageId -> GameDataM p (SurfaceData (P.PlatformImage p))
+lookupSurfaceSafe sid = do
+  surfaces <- gets gdSurfaces
+  return (surfaces ! sid)
 
 type GameDataBaseM p = StateT (GameData p) IO
 
 newtype GameDataM p a = GameDataM {
   runGameData :: RandT StdGen (GameDataBaseM p) a
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
+
+currentTicks :: GameDataM p TimeTicks
+currentTicks = gets gdCurrentTicks
+
+currentKeydowns :: GameDataM p Keydowns
+currentKeydowns = gets gdKeydowns
+
+currentTimeDelta :: GameDataM p TimeDelta
+currentTimeDelta = gets gdTimeDelta
 
 updateTicks :: GameDataM p ()
 updateTicks = do
@@ -120,5 +139,24 @@ renderSprites ss = do
   p <- gets gdPlatform
   liftIO $ P.renderSprites p ss
 
-runGame :: StdGen -> GameData p -> GameDataM p a -> IO (a,GameData p)
-runGame r gameData game = runStateT (evalRandT (runGameData game) r) gameData
+runGame' :: StdGen -> GameData p -> GameDataM p a -> IO a
+runGame' r gameData game = evalStateT (evalRandT (runGameData game) r) gameData
+
+--runGame :: Platform p => P.WindowTitle -> P.WindowSize -> GameDataM p a -> IO a
+runGame title size action = withPlatform title size $
+  \platform -> do
+    (images, anims) <- readMediaFiles (P.loadImage platform) mediaDir
+    ticks <- getTicks
+    g <- getStdGen
+    font <- P.loadFont platform (mediaDir <> "/stdfont.ttf") 15
+    let
+      gameData = GameData {
+          gdSurfaces = images
+        , gdAnims = anims
+        , gdPlatform = platform
+        , gdCurrentTicks = ticks
+        , gdTimeDelta = fromSeconds 0
+        , gdKeydowns = mempty
+        , gdFont = font
+        }
+    runGame' g gameData action

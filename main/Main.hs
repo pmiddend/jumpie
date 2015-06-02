@@ -1,10 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
-import           Control.Monad.State.Strict (get)
-import           System.Random              (getStdGen)
 import           Jumpie.Picturize          (picturizeGameState)
-import           Control.Monad.Random       (evalRand)
 import Jumpie.GameConfig
 import           Jumpie.Game
 import           Jumpie.GameObject
@@ -12,11 +9,8 @@ import           Jumpie.GameGeneration
 import Jumpie.GameState
 import Jumpie.GameData
 import Jumpie.Types
-import Wrench.Time
 import qualified Wrench.Keysym as KS
-import Wrench.Engine (withPlatform)
 import Wrench.Event
-import Wrench.ImageData (readMediaFiles)
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
 import Control.Lens((^.))
@@ -39,8 +33,8 @@ stageMainLoop gameState = do
     if outerGameOver events || (gameState ^. gsGameOver)
         then return gameState
         else do
-            gameData <- get
-            let incomingActions = concatMap kdToAction (gdKeydowns gameData)
+            kds <- currentKeydowns
+            let incomingActions = concatMap kdToAction kds
             (newPlayer,newCameraPosition,newTempSection,newSections,_) <-
                 processGameObjects gameState incomingActions
             let newState = gameState
@@ -80,16 +74,17 @@ updateCameraPosition cameraPos playerPos =
     V2 x (cameraPos ^. _y)
 
 main :: IO ()
-main = withPlatform "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $
-  \platform -> do
-    (images, anims) <- readMediaFiles (loadImage platform) mediaDir
-    ticks <- getTicks
-    g <- getStdGen
-    font <- loadFont platform (mediaDir <> "/stdfont.ttf") 15
+main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
+    ticks <- currentTicks
+    (player,sections) <- generateGame ticks
     let
-      gameData = GameData { gdSurfaces = images, gdAnims = anims, gdPlatform = platform, gdCurrentTicks = ticks, gdTimeDelta = fromSeconds 0, gdKeydowns = mempty, gdFont = font }
-      (player,sections) = evalRand (generateGame ticks) g
-      initialGameState = GameState { _gsPlayer = player,_gsSections = sections, _gsTempSection = [], _gsGameOver = False,_gsCameraPosition = V2 0 0 }
-    (lastGameState, lastGameData) <- runGame g gameData (stageMainLoop initialGameState)
-    _ <- runGame g lastGameData (gameoverMainLoop lastGameState)
+      initialGameState = GameState {
+          _gsPlayer = player
+        , _gsSections = sections
+        , _gsTempSection = []
+        , _gsGameOver = False
+        , _gsCameraPosition = V2 0 0
+        }
+    lastGameState <- stageMainLoop initialGameState
+    gameoverMainLoop lastGameState
     return ()

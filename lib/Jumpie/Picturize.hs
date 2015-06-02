@@ -5,8 +5,6 @@ module Jumpie.Picturize(
   ) where
 
 import           Data.Maybe                  (fromJust)
-import           Control.Monad.State.Strict  (get)
-
 import           Jumpie.GameConfig           (screenWidth,screenHeight)
 import           Jumpie.GameData
 import           Jumpie.GameObject
@@ -43,11 +41,9 @@ picturizeBox (Box p _ t) = return ((p ^. rectTopLeft) `pictureTranslated` pictur
 
 picturizeParticle :: Particle -> GameDataM p Picture
 picturizeParticle (Particle identifier pos inception) = do
-  gd <- get
-  let
-    ticks = gdCurrentTicks gd
-    image = currentAnimFrame inception ticks anim
-    anim = lookupAnimSafe gd identifier
+  ticks <- currentTicks
+  anim <- lookupAnimSafe identifier
+  let image = currentAnimFrame inception ticks anim
   return (pos `pictureTranslated` pictureSpriteCentered image)
 
 picturizeLine :: SensorLine -> GameDataM p Picture
@@ -60,9 +56,9 @@ boxTypeToSuffix BoxRight = "r"
 boxTypeToSuffix BoxSingleton = "s"
 
 currentAnimFrame :: TimeTicks -> TimeTicks -> Animation -> SpriteIdentifier
-currentAnimFrame animStart currentTicks anim =
+currentAnimFrame animStart currentTicks' anim =
   let
-    tdelta = toSeconds (currentTicks `tickDelta` animStart)
+    tdelta = toSeconds (currentTicks' `tickDelta` animStart)
     noFrames = length (anim ^. animFrames)
     animIndex = floor (tdelta / (fromIntegral (anim ^. animFrameSwitch) / 1000.0)) `mod` noFrames
   in
@@ -70,18 +66,18 @@ currentAnimFrame animStart currentTicks anim =
 
 picturizePlayer :: Platform p => Player -> GameDataM p Picture
 picturizePlayer p = do
-  gd <- get
+  ticks <- currentTicks
   let
-    ticks = gdCurrentTicks gd
     pp = p ^. playerPosition
+    playerStands = abs (p ^. playerVelocity ^. _x) <= 0.01
+    playerDirection = if p ^. playerVelocity ^. _x <= 0.0 then "left" else "right"
+  playerWalkAnim <- lookupAnimSafe ("player_walk_" <> playerDirection)
+  let 
     playerImage :: Text
     playerImage
-      | p ^. playerMode == Air = "player_fly_" ++ playerDirection
+      | p ^. playerMode == Air = "player_fly_" <> playerDirection
       | playerStands || isNothing (p ^. playerWalkSince) = "player_stand"
       | otherwise = currentAnimFrame (fromJust (p ^. playerWalkSince)) ticks playerWalkAnim
-    playerStands = abs (p ^. playerVelocity ^. _x) <= 0.01
-    playerWalkAnim = lookupAnimSafe gd ("player_walk_" ++ playerDirection)
-    playerDirection = if p ^. playerVelocity ^. _x <= 0.0 then "left" else "right"
   return (pp `pictureTranslated` pictureSpriteCentered playerImage)
 
 {-
