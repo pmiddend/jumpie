@@ -1,4 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Jumpie.GameData(
     GameData(..)
   , updateKeydowns
@@ -16,12 +17,12 @@ module Jumpie.GameData(
   ) where
 
 import qualified Data.Set as S
-import           Control.Monad.State.Strict (StateT, get, gets, put, runStateT)
+import           Control.Monad.State.Strict (StateT, get, gets, put, runStateT,MonadState)
 
 
 import           Jumpie.GameConfig          (gcTimeMultiplier)
 
-import           Control.Monad.Random       (RandT, evalRandT)
+import           Control.Monad.Random       (RandT, evalRandT,MonadRandom)
 import           System.Random              (StdGen)
 import qualified Wrench.Platform as P
 import Wrench.Time
@@ -55,7 +56,9 @@ lookupSurfaceSafe gd sid = gdSurfaces gd ! sid
 
 type GameDataBaseM p = StateT (GameData p) IO
 
-type GameDataM p = RandT StdGen (GameDataBaseM p)
+newtype GameDataM p a = GameDataM {
+  runGameData :: RandT StdGen (GameDataBaseM p) a
+  } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
 
 updateTicks :: GameDataM p ()
 updateTicks = do
@@ -118,4 +121,4 @@ renderSprites ss = do
   liftIO $ P.renderSprites p ss
 
 runGame :: StdGen -> GameData p -> GameDataM p a -> IO (a,GameData p)
-runGame r gameData game = runStateT (evalRandT game r) gameData
+runGame r gameData game = runStateT (evalRandT (runGameData game) r) gameData
