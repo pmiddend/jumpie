@@ -142,7 +142,7 @@ renderSprites ss = do
 runGame' :: StdGen -> GameData p -> GameDataM p a -> IO a
 runGame' r gameData game = evalStateT (evalRandT (runGameData game) r) gameData
 
---runGame :: Platform p => P.WindowTitle -> P.WindowSize -> GameDataM p a -> IO a
+runGame :: P.WindowTitle -> P.WindowSize -> GameDataM PlatformBackend () -> IO ()
 runGame title size action = withPlatform title size $
   \platform -> do
     (images, anims) <- readMediaFiles (P.loadImage platform) mediaDir
