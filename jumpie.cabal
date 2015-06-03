@@ -24,6 +24,7 @@ library
   hs-source-dirs:      lib
   exposed-modules:     Jumpie.GameData
                      , Jumpie.Types
+                     , Jumpie.Sensors
                      , Jumpie.GameState
                      , Jumpie.Game
                      , Jumpie.GameConfig
