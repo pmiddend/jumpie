@@ -22,13 +22,14 @@ import Control.Lens((^.))
 import Wrench.Animation
 import Data.List(tail,head,last)
 import Control.Lens(_1,_2,view)
+import Control.Monad.Random(MonadRandom)
 
-processGameObjects :: GameState -> [IncomingAction] -> GameDataM p (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
+processGameObjects :: (MonadRandom m,Monad m,MonadIO m,Applicative m,Game m) => GameState -> [IncomingAction] -> m (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
 processGameObjects gs actions = do
   -- [(WorldSection,[OutgoingAction])]
   sectionsWithActions <- traverse (processWorldSection gs actions) (gs ^. gsSections)
   (newTempSection,tempSectionActions) <- processWorldSection gs actions (gs ^. gsTempSection)
-  ticks <- currentTicks
+  ticks <- gcurrentTicks
   let
     sections = view _1 <$> sectionsWithActions
     secActions = join ((view _2) <$> sectionsWithActions)
@@ -54,18 +55,18 @@ processGameObjects gs actions = do
       return (newPlayer,gs ^. gsCameraPosition,newTempSection <> playerObjects,xs : tailSections,totalActions)
   
 
-processWorldSection :: GameState -> [IncomingAction] -> WorldSection -> GameDataM p (WorldSection,[OutgoingAction])
+processWorldSection :: (Monad m,Applicative m,Game m) => GameState -> [IncomingAction] -> WorldSection -> m (WorldSection,[OutgoingAction])
 processWorldSection gs actions section = do
   objectsnactions <- traverse (processGameObject gs actions) section
   let
     (newObjects,objectActions) = bimap concat concat . unzip $ objectsnactions
   return (newObjects,objectActions)
 
-processGameObject :: GameState -> [IncomingAction] -> GameObject -> GameDataM p ([GameObject],[OutgoingAction])
+processGameObject :: (Game m,Monad m) => GameState -> [IncomingAction] -> GameObject -> m ([GameObject],[OutgoingAction])
 processGameObject gs _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
   ObjectBox b -> do
-    ticks <- currentTicks
+    ticks <- gcurrentTicks
     if ticks > b ^. boxDeadline
       then return ([],[])
       else return ([ObjectBox b],[])
@@ -75,15 +76,15 @@ processGameObject gs _ o = case o of
 testGameOver :: GameState -> Bool
 testGameOver os = (os ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screenHeight
 
-processParticle :: GameState -> Particle -> GameDataM p ([GameObject],[OutgoingAction])
+processParticle :: (Monad m,Game m) => GameState -> Particle -> m ([GameObject],[OutgoingAction])
 processParticle _ b = do
-  currentTicks' <- currentTicks
-  anim <- lookupAnimSafe (b ^. particleIdentifier)
+  currentTicks' <- gcurrentTicks
+  anim <- glookupAnim (b ^. particleIdentifier)
   if (b ^. particleInception) `plusDuration` (anim ^. animLifetime)  < currentTicks'
     then return ([],[])
     else return ([ObjectParticle b],[])
 
-processPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
+processPlayerObject :: (Game m,Monad m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
 processPlayerObject gs ias p = case p ^. playerMode of
   Ground -> processGroundPlayerObject gs ias p
   Air -> processAirPlayerObject gs ias p
@@ -131,9 +132,9 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
         cSLCollision = lineCollision boxes cSL
         cSRCollision = lineCollision boxes cSR
 
-processGroundPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
+processGroundPlayerObject :: (Monad m,Game m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
 processGroundPlayerObject gs ias p = do
-  t <- currentTimeDelta
+  t <- gcurrentTimeDelta
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
         sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 4.0
         fCollision = sensFLCollision sensors <|> sensFRCollision sensors
@@ -168,10 +169,10 @@ processGroundPlayerObject gs ias p = do
           }
   return (np,sensorLines,[])
 
-processAirPlayerObject :: GameState -> [IncomingAction] -> Player -> GameDataM p (Player,[GameObject],[OutgoingAction])
+processAirPlayerObject :: (Monad m,Game m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
 processAirPlayerObject gs ias p = do
-  t <- currentTimeDelta
-  currentTicks' <- currentTicks
+  t <- gcurrentTimeDelta
+  currentTicks' <- gcurrentTicks
   let
     sensorLines = map (ObjectSensorLine . SensorLine) [sensW sensors,sensFL sensors,sensFR sensors,sensCL sensors,sensCR sensors]
     sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 0.0

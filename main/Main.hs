@@ -15,25 +15,26 @@ import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
 import Control.Lens((^.))
 import Linear.V2
+import Control.Monad.Random       (MonadRandom)
 
-gameoverMainLoop :: Platform p => GameState -> GameDataM p ()
+gameoverMainLoop :: (Monad m,Applicative m,Game m) => GameState -> m ()
 gameoverMainLoop gameState = do
-    events <- pollEvents
-    updateKeydowns events
+    events <- gpollEvents
+    gupdateKeydowns events
     unless (outerGameOver events) $
         do 
-          render =<< picturizeGameState gameState
+          grender =<< picturizeGameState gameState
           gameoverMainLoop gameState
 
-stageMainLoop :: Platform p => GameState -> GameDataM p GameState
+stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,Game m) => GameState -> m GameState
 stageMainLoop gameState = do
-    events <- pollEvents
-    updateTicks
-    updateKeydowns events
+    events <- gpollEvents
+    gupdateTicks
+    gupdateKeydowns events
     if outerGameOver events || (gameState ^. gsGameOver)
         then return gameState
         else do
-            kds <- currentKeydowns
+            kds <- gcurrentKeydowns
             let incomingActions = concatMap kdToAction kds
             (newPlayer,newCameraPosition,newTempSection,newSections,_) <-
                 processGameObjects gameState incomingActions
@@ -44,7 +45,7 @@ stageMainLoop gameState = do
                     , _gsTempSection = newTempSection
                     , _gsCameraPosition = updateCameraPosition newCameraPosition (newPlayer ^. playerPosition)
                     }
-            render =<< picturizeGameState gameState
+            grender =<< picturizeGameState gameState
             stageMainLoop newState
 
 kdToAction :: KS.Keysym -> [IncomingAction]
@@ -75,7 +76,7 @@ updateCameraPosition cameraPos playerPos =
 
 main :: IO ()
 main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
-    ticks <- currentTicks
+    ticks <- gcurrentTicks
     (player,sections) <- generateGame ticks
     let
       initialGameState = GameState {

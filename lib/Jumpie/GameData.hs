@@ -3,13 +3,16 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 module Jumpie.GameData(
     GameData
+{-
   , updateKeydowns
   , updateTicks
   , currentTicks
   , currentTimeDelta
   , currentKeydowns
-  , GameDataM
+-}
+  , Game(..)
   , runGame
+{-
   , pollEvents
   , renderBegin
   , renderFinish
@@ -18,6 +21,7 @@ module Jumpie.GameData(
   , render
   , lookupAnimSafe
   , lookupSurfaceSafe
+-}
   ) where
 
 import qualified Data.Set as S
@@ -36,26 +40,22 @@ import Wrench.Color
 import Wrench.KeyMovement
 import Wrench.Platform(Platform)
 import Wrench.Animation
+import Wrench.Rectangle
 import Wrench.AnimId
 import           Jumpie.Types               (Keydowns)
 import ClassyPrelude
 import           Data.Map.Strict             ((!))
 
-{-
-class Monad (g p) => Game g p where
-  gupdateKeydowns :: [Event] -> g p ()
-  gupdateTicks :: g p ()
-  gcurrentTicks :: g p TimeTicks
-  gcurrentTimeDelta :: g p TimeDelta
-  gcurrentKeydowns :: g p Keydowns
-  grenderBegin :: g p ()
-  grenderFinish :: g p ()
-  grenderSprites :: P.Platform p => [P.SpriteInstance (P.PlatformImage p)] -> g p ()
-  grenderClear :: g p ()
-  grender :: Picture -> g p ()
-  glookupAnim :: AnimId -> g p Animation
-  glookupSurface :: P.Platform p => ImageId -> g p (SurfaceData (P.PlatformImage p))
--}
+class Game m where
+  gpollEvents :: m [Event]
+  gupdateTicks :: m ()
+  gupdateKeydowns :: [Event] -> m ()
+  gcurrentTicks :: m TimeTicks
+  gcurrentTimeDelta :: m TimeDelta
+  gcurrentKeydowns :: m Keydowns
+  grender :: Picture -> m ()
+  glookupAnim :: AnimId -> m Animation
+  glookupImageRectangle :: ImageId -> m Rectangle
 
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (P.PlatformImage p)
@@ -67,19 +67,20 @@ data GameData p = GameData {
   , gdFont         :: P.PlatformFont p
   }
 
---lookupAnimSafe :: GameData p -> AnimId -> Animation
---lookupAnimSafe gd aid = gdAnims gd ! aid
 lookupAnimSafe :: AnimId -> GameDataM p Animation
 lookupAnimSafe aid = do
   anims <- gets gdAnims
   return (anims ! aid)
 
---lookupSurfaceSafe :: Platform p => GameData p -> ImageId -> SurfaceData (P.PlatformImage p)
---lookupSurfaceSafe gd sid = gdSurfaces gd ! sid
 lookupSurfaceSafe :: Platform p => ImageId -> GameDataM p (SurfaceData (P.PlatformImage p))
 lookupSurfaceSafe sid = do
   surfaces <- gets gdSurfaces
   return (surfaces ! sid)
+
+lookupSurfaceRectangleSafe :: Platform p => ImageId -> GameDataM p Rectangle
+lookupSurfaceRectangleSafe sid = do
+  surfaces <- gets gdSurfaces
+  return (snd (surfaces ! sid))
 
 type GameDataBaseM p = StateT (GameData p) IO
 
@@ -87,21 +88,16 @@ newtype GameDataM p a = GameDataM {
   runGameData :: RandT StdGen (GameDataBaseM p) a
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
 
-{-           
-instance Game GameDataM where
-  gupdateKeydowns = undefined
-  gupdateTicks = undefined
-  gcurrentTicks = undefined
-  gcurrentTimeDelta = undefined
-  gcurrentKeydowns = undefined
-  grenderBegin = undefined
-  grenderFinish = undefined
-  grenderSprites = undefined
-  grenderClear = undefined
-  grender = undefined
-  glookupAnim = undefined
-  glookupSurface = undefined
--}
+instance Platform p => Game (GameDataM p) where 
+  gpollEvents = pollEvents
+  gupdateTicks = updateTicks
+  gupdateKeydowns = updateKeydowns
+  gcurrentTicks = currentTicks
+  gcurrentTimeDelta = currentTimeDelta
+  gcurrentKeydowns = currentKeydowns
+  grender = render
+  glookupAnim = lookupAnimSafe
+  glookupImageRectangle = lookupSurfaceRectangleSafe
 
 currentTicks :: GameDataM p TimeTicks
 currentTicks = gets gdCurrentTicks
