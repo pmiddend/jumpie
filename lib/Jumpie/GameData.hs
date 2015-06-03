@@ -1,50 +1,34 @@
-{-# LANGUAGE NoImplicitPrelude #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE NoImplicitPrelude          #-}
 module Jumpie.GameData(
     GameData
-{-
-  , updateKeydowns
-  , updateTicks
-  , currentTicks
-  , currentTimeDelta
-  , currentKeydowns
--}
   , Game(..)
   , runGame
-{-
-  , pollEvents
-  , renderBegin
-  , renderFinish
-  , renderSprites
-  , renderClear
-  , render
-  , lookupAnimSafe
-  , lookupSurfaceSafe
--}
   ) where
 
-import qualified Data.Set as S
-import           Control.Monad.State.Strict (StateT, get, gets, put, evalStateT,MonadState)
+import           Control.Monad.State.Strict (MonadState, StateT, evalStateT,
+                                             get, gets, put)
+import qualified Data.Set                   as S
 
 
-import           Control.Monad.Random       (RandT, evalRandT,MonadRandom)
-import           System.Random              (StdGen,getStdGen)
-import qualified Wrench.Platform as P
-import Wrench.Time
-import Wrench.Picture
-import Jumpie.GameConfig
-import Wrench.Engine
-import Wrench.ImageData
-import Wrench.Color
-import Wrench.KeyMovement
-import Wrench.Platform(Platform)
-import Wrench.Animation
-import Wrench.Rectangle
-import Wrench.AnimId
+import           ClassyPrelude
+import           Control.Monad.Random       (MonadRandom, RandT, evalRandT)
+import           Data.Map.Strict            ((!))
+import           Jumpie.GameConfig
 import           Jumpie.Types               (Keydowns)
-import ClassyPrelude
-import           Data.Map.Strict             ((!))
+import           System.Random              (StdGen, getStdGen)
+import           Wrench.Animation
+import           Wrench.AnimId
+import           Wrench.Color
+import           Wrench.Engine
+import           Wrench.ImageData
+import           Wrench.KeyMovement
+import           Wrench.Picture
+import           Wrench.Platform            (Platform)
+import qualified Wrench.Platform            as P
+import           Wrench.Rectangle
+import           Wrench.Time
 
 class Game m where
   gpollEvents :: m [Event]
@@ -88,7 +72,7 @@ newtype GameDataM p a = GameDataM {
   runGameData :: RandT StdGen (GameDataBaseM p) a
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
 
-instance Platform p => Game (GameDataM p) where 
+instance Platform p => Game (GameDataM p) where
   gpollEvents = pollEvents
   gupdateTicks = updateTicks
   gupdateKeydowns = updateKeydowns
