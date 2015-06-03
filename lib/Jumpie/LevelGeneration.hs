@@ -34,8 +34,7 @@ import ClassyPrelude hiding(Real,intersect,maximum,(\\))
 import Linear.V2
 import Data.List((!!),maximum,(\\))
 import Control.Lens((^.))
-
-data Platform = Platform PointInt PointInt deriving(Show)
+import Jumpie.Platform
 
 safeSearch :: [String] -> Int -> String
 safeSearch s a = if length s <= a then error "Couldn't: \"" <> show a <> "\"" else s !! a

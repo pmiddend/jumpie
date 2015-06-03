@@ -25,6 +25,7 @@ library
   exposed-modules:     Jumpie.GameData
                      , Jumpie.Types
                      , Jumpie.Sensors
+                     , Jumpie.Platform
                      , Jumpie.GameState
                      , Jumpie.Game
                      , Jumpie.GameConfig
