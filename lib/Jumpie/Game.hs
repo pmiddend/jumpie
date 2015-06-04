@@ -5,7 +5,7 @@ import           Data.Maybe                   (fromJust)
 import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
 import           Jumpie.GameConfig
-import           Jumpie.GameData
+import           Jumpie.MonadGame
 import           Jumpie.GameObject
 import           Jumpie.GameState
 import           Jumpie.GameGeneration
@@ -25,7 +25,7 @@ import Data.List(tail,head,last)
 import Control.Lens(_1,_2,view)
 import Control.Monad.Random(MonadRandom)
 
-processGameObjects :: (MonadRandom m,Monad m,MonadIO m,Applicative m,Game m) => GameState -> [IncomingAction] -> m (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
+processGameObjects :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadGame m) => GameState -> [IncomingAction] -> m (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
 processGameObjects gs actions = do
   -- [(WorldSection,[OutgoingAction])]
   sectionsWithActions <- traverse (processWorldSection gs actions) (gs ^. gsSections)
@@ -56,14 +56,14 @@ processGameObjects gs actions = do
       return (newPlayer,gs ^. gsCameraPosition,newTempSection <> playerObjects,xs : tailSections,totalActions)
   
 
-processWorldSection :: (Monad m,Applicative m,Game m) => GameState -> [IncomingAction] -> WorldSection -> m (WorldSection,[OutgoingAction])
+processWorldSection :: (Monad m,Applicative m,MonadGame m) => GameState -> [IncomingAction] -> WorldSection -> m (WorldSection,[OutgoingAction])
 processWorldSection gs actions section = do
   objectsnactions <- traverse (processGameObject gs actions) section
   let
     (newObjects,objectActions) = bimap concat concat . unzip $ objectsnactions
   return (newObjects,objectActions)
 
-processGameObject :: (Game m,Monad m) => GameState -> [IncomingAction] -> GameObject -> m ([GameObject],[OutgoingAction])
+processGameObject :: (Functor m,MonadGame m,Monad m) => GameState -> [IncomingAction] -> GameObject -> m ([GameObject],[OutgoingAction])
 processGameObject gs _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
   ObjectBox b -> do
@@ -77,15 +77,15 @@ processGameObject gs _ o = case o of
 testGameOver :: GameState -> Bool
 testGameOver os = (os ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screenHeight
 
-processParticle :: (Monad m,Game m) => GameState -> Particle -> m ([GameObject],[OutgoingAction])
+processParticle :: (Functor m,Monad m,MonadGame m) => GameState -> Particle -> m ([GameObject],[OutgoingAction])
 processParticle _ b = do
   currentTicks' <- gcurrentTicks
-  anim <- glookupAnim (b ^. particleIdentifier)
+  anim <- glookupAnimUnsafe (b ^. particleIdentifier)
   if (b ^. particleInception) `plusDuration` (anim ^. animLifetime)  < currentTicks'
     then return ([],[])
     else return ([ObjectParticle b],[])
 
-processPlayerObject :: (Game m,Monad m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
+processPlayerObject :: (MonadGame m,Monad m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
 processPlayerObject gs ias p = case p ^. playerMode of
   Ground -> processGroundPlayerObject gs ias p
   Air -> processAirPlayerObject gs ias p
@@ -121,7 +121,7 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
         cSLCollision = lineCollision boxes cSL
         cSRCollision = lineCollision boxes cSR
 
-processGroundPlayerObject :: (Monad m,Game m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
+processGroundPlayerObject :: (Monad m,MonadGame m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
 processGroundPlayerObject gs ias p = do
   t <- gcurrentTimeDelta
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensors ^. sensW,sensors ^. sensFL,sensors ^. sensFR,sensors ^. sensCL,sensors ^. sensCR]
@@ -158,7 +158,7 @@ processGroundPlayerObject gs ias p = do
           }
   return (np,sensorLines,[])
 
-processAirPlayerObject :: (Monad m,Game m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
+processAirPlayerObject :: (Monad m,MonadGame m) => GameState -> [IncomingAction] -> Player -> m (Player,[GameObject],[OutgoingAction])
 processAirPlayerObject gs ias p = do
   t <- gcurrentTimeDelta
   currentTicks' <- gcurrentTicks

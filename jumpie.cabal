@@ -22,7 +22,7 @@ source-repository head
 library
   -- other-modules:
   hs-source-dirs:      lib
-  exposed-modules:     Jumpie.GameData
+  exposed-modules:     Jumpie.MonadGame
                      , Jumpie.Types
                      , Jumpie.Sensors
                      , Jumpie.Platform

@@ -7,7 +7,7 @@ import           Jumpie.Game
 import           Jumpie.GameObject
 import           Jumpie.GameGeneration
 import Jumpie.GameState
-import Jumpie.GameData
+import Jumpie.MonadGame
 import Jumpie.Types
 import qualified Wrench.Keysym as KS
 import Wrench.Event
@@ -17,7 +17,7 @@ import Control.Lens((^.))
 import Linear.V2
 import Control.Monad.Random       (MonadRandom)
 
-gameoverMainLoop :: (Monad m,Applicative m,Game m) => GameState -> m ()
+gameoverMainLoop :: (Monad m,Applicative m,MonadGame m) => GameState -> m ()
 gameoverMainLoop gameState = do
     events <- gpollEvents
     gupdateKeydowns events
@@ -26,7 +26,7 @@ gameoverMainLoop gameState = do
           grender =<< picturizeGameState gameState
           gameoverMainLoop gameState
 
-stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,Game m) => GameState -> m GameState
+stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,MonadGame m) => GameState -> m GameState
 stageMainLoop gameState = do
     events <- gpollEvents
     gupdateTicks
