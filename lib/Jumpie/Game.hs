@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Jumpie.Game(processGameObjects,testGameOver) where
 
 import           Data.Maybe                   (fromJust)
@@ -22,12 +23,25 @@ import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.))
 import Wrench.Animation
 import Data.List(tail,head,last)
-import Control.Lens(_1,_2,view)
+import Control.Lens(_1,_2,view,(.=))
 import Control.Monad.Random(MonadRandom)
+import Control.Monad.State.Strict(gets,get,MonadState)
 
-processGameObjects :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadGame m) => GameState -> [IncomingAction] -> m (Player,PointReal,WorldSection,[WorldSection],[OutgoingAction])
-processGameObjects gs actions = do
+updateCameraPosition :: PointReal -> PointReal -> PointReal
+updateCameraPosition cameraPos playerPos =
+  let
+    k = cameraPos ^. _x
+    px = playerPos ^. _x
+    w = fromIntegral screenWidth
+    z = fromIntegral cameraTolerance
+    x = min (max k ((w-z)/2 + px - w)) (px - (w-z)/2)
+  in
+    V2 x (cameraPos ^. _y)
+
+processGameObjects :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m) => [IncomingAction] -> m [OutgoingAction]
+processGameObjects actions = do
   -- [(WorldSection,[OutgoingAction])]
+  gs <- get
   sectionsWithActions <- traverse (processWorldSection gs actions) (gs ^. gsSections)
   (newTempSection,tempSectionActions) <- processWorldSection gs actions (gs ^. gsTempSection)
   ticks <- gcurrentTicks
@@ -35,6 +49,7 @@ processGameObjects gs actions = do
     sections = view _1 <$> sectionsWithActions
     secActions = join ((view _2) <$> sectionsWithActions)
   (newPlayer,playerObjects,playerActions) <- processPlayerObject gs actions (gs ^. gsPlayer) 
+  gsPlayer .= newPlayer
   let
     firstSection = head sections
     tailSections = tail sections
@@ -50,10 +65,18 @@ processGameObjects gs actions = do
         newTempSectionMoved = moveSection newFirstSectionStart newTempSection
         movedTails = (moveSection newFirstSectionStart) <$> tailSections
       newSection <- moveSection (lastSectionEnd-newFirstSectionStart+fromIntegral gcTileSize) <$> (generateSection ticks)
+      player <- gets _gsPlayer
       -- TODO: camera position only changes x value - better lens here
-      return (newPlayer,V2 (gs ^. gsCameraPosition ^. _x - newFirstSectionStart) (gs ^. gsCameraPosition  ^. _y),newTempSectionMoved,(movedTails ++ [newSection]),totalActions)
+      gsCameraPosition .= updateCameraPosition (V2 (gs ^. gsCameraPosition ^. _x - newFirstSectionStart) (gs ^. gsCameraPosition  ^. _y)) (player ^. playerPosition) 
+      gsTempSection .= newTempSectionMoved
+      gsSections .= movedTails ++ [newSection]
+      return totalActions
     xs -> do
-      return (newPlayer,gs ^. gsCameraPosition,newTempSection <> playerObjects,xs : tailSections,totalActions)
+      gsTempSection .= newTempSection <> playerObjects
+      player <- gets _gsPlayer
+      gsCameraPosition .= updateCameraPosition (gs ^. gsCameraPosition) (player ^. playerPosition) 
+      gsSections .= xs : tailSections
+      return totalActions
   
 
 processWorldSection :: (Monad m,Applicative m,MonadGame m) => GameState -> [IncomingAction] -> WorldSection -> m (WorldSection,[OutgoingAction])
@@ -74,8 +97,10 @@ processGameObject gs _ o = case o of
   ObjectParticle b -> processParticle gs b
   ObjectSensorLine _ -> return ([],[])
 
-testGameOver :: GameState -> Bool
-testGameOver os = (os ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screenHeight
+testGameOver :: MonadState GameState m => m Bool
+testGameOver = do
+  gs <- get
+  return ((gs ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screenHeight)
 
 processParticle :: (Functor m,Monad m,MonadGame m) => GameState -> Particle -> m ([GameObject],[OutgoingAction])
 processParticle _ b = do

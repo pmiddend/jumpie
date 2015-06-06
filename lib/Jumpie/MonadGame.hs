@@ -12,14 +12,10 @@ module Jumpie.MonadGame(
 import           Control.Monad.State.Strict (MonadState, StateT, evalStateT,
                                              get, gets, put)
 import qualified Data.Set                   as S
-
-
 import           ClassyPrelude
-import           Control.Monad.Random       (MonadRandom, RandT, evalRandT)
 import Data.Maybe(fromJust)
 import           Jumpie.GameConfig
 import           Jumpie.Types               (Keydowns)
-import           System.Random              (StdGen, getStdGen)
 import           Wrench.Animation
 import           Wrench.AnimId
 import           Wrench.Engine
@@ -30,6 +26,8 @@ import           Wrench.Platform            (Platform)
 import qualified Wrench.Platform            as P
 import           Wrench.Rectangle
 import           Wrench.Time
+import System.Random(StdGen,getStdGen)
+import Control.Monad.Random(MonadRandom(..),RandT,evalRandT)
 
 class MonadGame m where
   gpollEvents :: m [Event]
@@ -58,11 +56,20 @@ data GameData p = GameData {
   , gdFont         :: P.PlatformFont p
   }
 
-type GameDataBaseM p = StateT (GameData p) IO
-
 newtype GameDataM p a = GameDataM {
-  runGameData :: RandT StdGen (GameDataBaseM p) a
+  runGameData :: RandT StdGen (StateT (GameData p) IO) a
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
+
+instance (Monad m,MonadGame m) => MonadGame (StateT n m) where
+  gpollEvents = lift gpollEvents
+  gupdateTicks = lift gupdateTicks
+  gupdateKeydowns e = lift (gupdateKeydowns e)
+  gcurrentTicks = lift gcurrentTicks
+  gcurrentTimeDelta = lift gcurrentTimeDelta
+  gcurrentKeydowns = lift gcurrentKeydowns
+  grender p = lift (grender p)
+  glookupAnim aid = lift (glookupAnim aid)
+  glookupImageRectangle i = lift (glookupImageRectangle i)
 
 instance Platform p => MonadGame (GameDataM p) where
   gpollEvents = do
@@ -104,15 +111,11 @@ processKeydowns k es = (k \\ keyUps) `union` keyDowns
         keyDownSym (Keyboard KeyDown _ keysym) = [keysym]
         keyDownSym _ = []
 
-runGame' :: StdGen -> GameData p -> GameDataM p a -> IO a
-runGame' r gameData game = evalStateT (evalRandT (runGameData game) r) gameData
-
 runGame :: P.WindowTitle -> P.WindowSize -> GameDataM PlatformBackend () -> IO ()
 runGame title size action = withPlatform title size $
   \platform -> do
     (images, anims) <- readMediaFiles (P.loadImage platform) mediaDir
     ticks <- getTicks
-    g <- getStdGen
     font <- P.loadFont platform (mediaDir <> "/stdfont.ttf") 15
     let
       gameData = GameData {
@@ -124,4 +127,5 @@ runGame title size action = withPlatform title size $
         , gdKeydowns = mempty
         , gdFont = font
         }
-    runGame' g gameData action
+    r <- getStdGen
+    evalStateT (evalRandT (runGameData action) r) gameData

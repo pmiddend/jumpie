@@ -1,10 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts #-}
 module Main where
 
 import           Jumpie.Picturize          (picturizeGameState)
 import Jumpie.GameConfig
 import           Jumpie.Game
-import           Jumpie.GameObject
 import           Jumpie.GameGeneration
 import Jumpie.GameState
 import Jumpie.MonadGame
@@ -13,40 +13,38 @@ import qualified Wrench.Keysym as KS
 import Wrench.Event
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
-import Control.Lens((^.))
+import Control.Lens((^.),(.=),use)
 import Linear.V2
 import Control.Monad.Random       (MonadRandom)
+import Control.Monad.State.Strict(get,MonadState,execStateT)
 
-gameoverMainLoop :: (Monad m,Applicative m,MonadGame m) => GameState -> m ()
-gameoverMainLoop gameState = do
+gameoverMainLoop :: (Monad m,Applicative m,MonadState GameState m,MonadGame m) => m ()
+gameoverMainLoop = do
     events <- gpollEvents
     gupdateKeydowns events
     unless (outerGameOver events) $
         do 
+          gameState <- get
           grender =<< picturizeGameState gameState
-          gameoverMainLoop gameState
+          gameoverMainLoop
 
-stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,MonadGame m) => GameState -> m GameState
-stageMainLoop gameState = do
+stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,MonadGame m,MonadState GameState m) => m ()
+stageMainLoop = do
     events <- gpollEvents
     gupdateTicks
     gupdateKeydowns events
-    if outerGameOver events || (gameState ^. gsGameOver)
-        then return gameState
+    gameOverBefore <- use gsGameOver
+    if outerGameOver events || gameOverBefore
+        then return ()
         else do
             kds <- gcurrentKeydowns
             let incomingActions = concatMap kdToAction kds
-            (newPlayer,newCameraPosition,newTempSection,newSections,_) <-
-                processGameObjects gameState incomingActions
-            let newState = gameState
-                    { _gsPlayer = newPlayer
-                    , _gsGameOver = testGameOver gameState
-                    , _gsSections = newSections
-                    , _gsTempSection = newTempSection
-                    , _gsCameraPosition = updateCameraPosition newCameraPosition (newPlayer ^. playerPosition)
-                    }
-            grender =<< picturizeGameState gameState
-            stageMainLoop newState
+            _ <- processGameObjects incomingActions
+            go <- testGameOver
+            gsGameOver .= go
+            gs <- get
+            grender =<< picturizeGameState gs
+            stageMainLoop
 
 kdToAction :: KS.Keysym -> [IncomingAction]
 kdToAction sc = fromMaybe [] $
@@ -63,17 +61,6 @@ outerGameOver = any outerGameOver'
           outerGameOver' (Keyboard _ _ KS.Escape) = True
           outerGameOver' _ = False
 
-updateCameraPosition :: PointReal -> PointReal -> PointReal
-updateCameraPosition cameraPos playerPos =
-  let
-    k = cameraPos ^. _x
-    px = playerPos ^. _x
-    w = fromIntegral screenWidth
-    z = fromIntegral cameraTolerance
-    x = min (max k ((w-z)/2 + px - w)) (px - (w-z)/2)
-  in
-    V2 x (cameraPos ^. _y)
-
 main :: IO ()
 main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
     ticks <- gcurrentTicks
@@ -86,6 +73,6 @@ main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
         , _gsGameOver = False
         , _gsCameraPosition = V2 0 0
         }
-    lastGameState <- stageMainLoop initialGameState
-    gameoverMainLoop lastGameState
+    lastGameState <- execStateT stageMainLoop initialGameState
+    _ <- execStateT gameoverMainLoop lastGameState
     return ()
