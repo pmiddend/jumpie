@@ -22,7 +22,7 @@ import ClassyPrelude hiding(Real,head,last)
 import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.))
 import Wrench.Animation
-import Data.List(tail,head,last)
+import Data.List(last)
 import Control.Lens((.=))
 import Control.Monad.Random(MonadRandom)
 import Control.Monad.State.Strict(gets,get,MonadState)
@@ -47,14 +47,11 @@ processGameObjects actions = do
   newTempSection <- processWorldSection actions (gs ^. gsTempSection)
   (newPlayer,playerObjects) <- processPlayerObject actions (gs ^. gsPlayer) 
   gsPlayer .= newPlayer
-  let
-    firstSection = head sections
-    tailSections = tail sections
-  case firstSection of
-    [] -> do
+  case sections of
+    [] -> error "Empty list of sections"
+    []:(newFirstSection:tailSections) -> do
       putStrLn "Generating new section"
       let
-        newFirstSection = head tailSections
         lastSection = last tailSections
         (newFirstSectionStart,_) = sectionWidth newFirstSection
         (_,lastSectionEnd) = sectionWidth lastSection
@@ -66,11 +63,11 @@ processGameObjects actions = do
       gsTempSection .= newTempSectionMoved
       gsSections .= movedTails ++ [newSection]
       return ()
-    xs -> do
+    (firstSection:tailSections) -> do
       gsTempSection .= newTempSection <> playerObjects
       player <- gets _gsPlayer
       gsCameraPosition .= updateCameraPosition (gs ^. gsCameraPosition) (player ^. playerPosition) 
-      gsSections .= xs : tailSections
+      gsSections .= firstSection : tailSections
       return ()
   
 
