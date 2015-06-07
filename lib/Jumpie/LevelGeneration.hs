@@ -82,7 +82,7 @@ newLevelGen yrange maxLength startTime startPlatforms =
       newPlatforms plats numberOfPlats (rightmost+2,rightmost+4) yrange maxLength newDeadline
 
 iterateNewPlatforms :: (MonadRandom m, MonadWriter [Text] m) => PlatformCount -> PlatformYRange -> PlatformMaxLength -> PlatformStartTime -> [Platform] -> m [Platform]
-iterateNewPlatforms count yrange maxLen startTime startPlats = myIterate count startPlats newLevelGen yrange maxLen startTime)
+iterateNewPlatforms count yrange maxLen startTime startPlats = myIterate count startPlats (newLevelGen yrange maxLen startTime)
 
 myIterate :: (Semigroup t, Monoid t, Monad m) => Int -> t -> (t -> m t) -> m t
 myIterate count start g = f' count start
