@@ -7,6 +7,7 @@ import           Control.Monad.Writer.Strict       (runWriterT)
 import           Control.Monad.Random       (evalRandT)
 import Jumpie.Geometry.Rect
 import Linear.V2
+import Wrench.Time
 
 
 f :: (Semigroup t, Monoid t, Monad m) => Int -> (t -> m t) -> m t
@@ -21,10 +22,11 @@ f count g = f' count mempty
 main :: IO ()
 main = do
   g <- getStdGen
+  t <- getTicks
   let
     boundingBox = Rect (V2 0 0) (V2 100 10)
     maxLen = 3
-    plats = f 10 (LG.newLevelGen (0,9) maxLen)
+    plats = f 10 (LG.newLevelGen (0,9) maxLen t)
     {-plats = do
       startPlat <- LG.newLevelGen (0,9) maxLen []
       nextPlats <- LG.newLevelGen (0,9) maxLen startPlat

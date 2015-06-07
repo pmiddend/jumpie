@@ -55,7 +55,7 @@ library
                        classy-prelude,
                        lens,
                        linear
-  ghc-options: -Wall
+  ghc-options: -Wall -fno-warn-typed-holes
   default-language:    Haskell2010
   default-extensions: NoImplicitPrelude
 
@@ -102,6 +102,6 @@ executable jumpie
                      , MonadRandom
                      , mtl
                      , random
-  ghc-options: -Wall
+  ghc-options: -Wall -fno-warn-typed-holes
   default-language:    Haskell2010
   default-extensions: NoImplicitPrelude

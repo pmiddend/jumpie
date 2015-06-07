@@ -44,7 +44,6 @@ processGameObjects actions = do
   gs <- get
   sectionsWithActions <- traverse (processWorldSection gs actions) (gs ^. gsSections)
   (newTempSection,tempSectionActions) <- processWorldSection gs actions (gs ^. gsTempSection)
-  ticks <- gcurrentTicks
   let
     sections = view _1 <$> sectionsWithActions
     secActions = join ((view _2) <$> sectionsWithActions)
@@ -64,10 +63,9 @@ processGameObjects actions = do
         (_,lastSectionEnd) = sectionWidth lastSection
         newTempSectionMoved = moveSection newFirstSectionStart newTempSection
         movedTails = (moveSection newFirstSectionStart) <$> tailSections
-      newSection <- moveSection (lastSectionEnd-newFirstSectionStart+fromIntegral gcTileSize) <$> (generateSection ticks)
-      player <- gets _gsPlayer
+      newSection <- moveSection (lastSectionEnd-newFirstSectionStart+fromIntegral gcTileSize) <$> (generateSection (gs ^. gsMaxDeadline))
       -- TODO: camera position only changes x value - better lens here
-      gsCameraPosition .= updateCameraPosition (V2 (gs ^. gsCameraPosition ^. _x - newFirstSectionStart) (gs ^. gsCameraPosition  ^. _y)) (player ^. playerPosition) 
+      gsCameraPosition .= updateCameraPosition (V2 (gs ^. gsCameraPosition ^. _x - newFirstSectionStart) (gs ^. gsCameraPosition  ^. _y)) (newPlayer ^. playerPosition) 
       gsTempSection .= newTempSectionMoved
       gsSections .= movedTails ++ [newSection]
       return totalActions

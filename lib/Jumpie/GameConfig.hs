@@ -1,29 +1,4 @@
-module Jumpie.GameConfig(
-  gcWSSize,
-  gcTileSize,
-  gcPlayerHeight,
-  gcPlayerMaxSpeed,
-  gcStars,
-  gcDec,
-  cameraTolerance,
-  gcStarCollisionDistance,
-  gcAir,
-  gcGrv,
-  gcAcc,
-  gcJmp,
-  gcFrc,
-  gcPlatCount,
-  gcPlatMaxLength,
-  gcTimeMultiplier,
-  screenWidth,
-  screenHeight,
-  mediaDir,
-  backgroundColor,
-  gcStarLifetime,
-  gcStarWiggleHeight,
-  gcStarWiggleSpeed,
-  gcAudioChunkSize
-  ) where
+module Jumpie.GameConfig where
 
 import Wrench.Time
 import Wrench.Color
@@ -32,6 +7,12 @@ import ClassyPrelude hiding(Real)
 
 backgroundColor :: Color
 backgroundColor = mkColorFromRgba 94 129 162 255
+
+gcDeadlineIncrement :: TimeDelta
+gcDeadlineIncrement = fromSeconds 1
+
+gcFirstPlatformWait :: TimeDelta
+gcFirstPlatformWait = fromSeconds 3
                   
 screenWidth,screenHeight,cameraTolerance :: Int
 screenWidth = 1200

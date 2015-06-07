@@ -7,13 +7,16 @@ import Jumpie.GameConfig
 import           Jumpie.Game
 import           Jumpie.GameGeneration
 import Jumpie.GameState
+import Jumpie.GameObject
 import Jumpie.MonadGame
 import Jumpie.Types
 import qualified Wrench.Keysym as KS
 import Wrench.Event
+import Wrench.Time
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
-import Control.Lens((^.),(.=),use)
+import Control.Lens((.=),use,(^?!),_Just)
+import Control.Lens.Fold(maximumOf)
 import Linear.V2
 import Control.Monad.Random       (MonadRandom)
 import Control.Monad.State.Strict(get,MonadState,execStateT)
@@ -24,27 +27,23 @@ gameoverMainLoop = do
     gupdateKeydowns events
     unless (outerGameOver events) $
         do 
-          gameState <- get
-          grender =<< picturizeGameState gameState
+          grender =<< picturizeGameState =<< get
           gameoverMainLoop
 
 stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,MonadGame m,MonadState GameState m) => m ()
 stageMainLoop = do
-    events <- gpollEvents
-    gupdateTicks
-    gupdateKeydowns events
-    gameOverBefore <- use gsGameOver
-    if outerGameOver events || gameOverBefore
-        then return ()
-        else do
-            kds <- gcurrentKeydowns
-            let incomingActions = concatMap kdToAction kds
-            _ <- processGameObjects incomingActions
-            go <- testGameOver
-            gsGameOver .= go
-            gs <- get
-            grender =<< picturizeGameState gs
-            stageMainLoop
+  events <- gpollEvents
+  gupdateTicks
+  gupdateKeydowns events
+  gameOverBefore <- use gsGameOver
+  unless (outerGameOver events || gameOverBefore) $ do
+    kds <- gcurrentKeydowns
+    let incomingActions = concatMap kdToAction kds
+    _ <- processGameObjects incomingActions
+    go <- testGameOver
+    gsGameOver .= go
+    grender =<< picturizeGameState =<< get
+    stageMainLoop
 
 kdToAction :: KS.Keysym -> [IncomingAction]
 kdToAction sc = fromMaybe [] $
@@ -64,7 +63,7 @@ outerGameOver = any outerGameOver'
 main :: IO ()
 main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
     ticks <- gcurrentTicks
-    (player,sections) <- generateGame ticks
+    (player,sections) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
     let
       initialGameState = GameState {
           _gsPlayer = player
@@ -72,6 +71,7 @@ main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
         , _gsTempSection = []
         , _gsGameOver = False
         , _gsCameraPosition = V2 0 0
+        , _gsMaxDeadline = maximumOf (traverse . traverse . _ObjectBox . boxDeadline) sections ^?! _Just
         }
     lastGameState <- execStateT stageMainLoop initialGameState
     _ <- execStateT gameoverMainLoop lastGameState

@@ -18,6 +18,7 @@ module Jumpie.GameObject(
   boxDeadline,
   particleInception,
   particleIdentifier,
+  _ObjectBox,
   Box(..),
   isBox,
   isParticle,
@@ -99,6 +100,8 @@ data GameObject = ObjectPlayer Player
                 | ObjectSensorLine SensorLine
                 | ObjectParticle Particle
   deriving(Show)
+
+$(makePrisms ''GameObject)
 
 instance MoveableObject GameObject where
   moveObject (ObjectPlayer p) v = ObjectPlayer (moveObject p v)

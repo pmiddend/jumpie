@@ -16,25 +16,22 @@ module Jumpie.LevelGeneration(
   iterateNewPlatforms,
   newLevelGen) where
 
---import           Control.Category             ((>>>))
 import           Control.Monad.Random         (MonadRandom, getRandomR)
 import           Jumpie.GameConfig            (gcGrv, gcJmp, gcPlayerMaxSpeed,
-                                               gcTileSize)
---import           Jumpie.Geometry.Intersection (parabolaPointIntersects)
---import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
+                                               gcTileSize,gcDeadlineIncrement)
 import           Jumpie.Geometry.Rect(Rect(..),dimensions)
 import Control.Monad.Writer.Class
 import           Jumpie.List                  (orEmptyTrue, replaceNth,
                                                setPartList)
---import           Jumpie.Tuple                 (both)
 import           Jumpie.Random                 (randomElemM)
 import           Jumpie.Types                 (PointInt,
                                                Real, RectInt)
 import ClassyPrelude hiding(Real,intersect,maximum,(\\))
 import Linear.V2
 import Data.List((!!),maximum,(\\))
-import Control.Lens((^.))
+import Control.Lens((^.),view)
 import Jumpie.Platform
+import Wrench.Time
 
 safeSearch :: [String] -> Int -> String
 safeSearch s a = if length s <= a then error "Couldn't: \"" <> show a <> "\"" else s !! a
@@ -42,7 +39,7 @@ safeSearch s a = if length s <= a then error "Couldn't: \"" <> show a <> "\"" el
 showPlatforms :: RectInt -> [Platform] -> [String]
 showPlatforms r = showPlatforms' (replicate h (replicate w '0'))
   where showPlatforms' :: [String] -> [Platform] -> [String]
-        showPlatforms' s (Platform (V2  x0 y0) (V2  x1 _):ps) = showPlatforms' (replaceNth s y0 (setPartList (safeSearch s y0{-(s !! y0)-}) (x0,x1+1) '1')) ps
+        showPlatforms' s (Platform (V2  x0 y0) (V2  x1 _) _:ps) = showPlatforms' (replaceNth s y0 (setPartList (safeSearch s y0{-(s !! y0)-}) (x0,x1+1) '1')) ps
         showPlatforms' s [] = s
         (V2  w h) = r ^. dimensions
 
@@ -52,27 +49,37 @@ showPlatformsPpm r@(Rect _ (V2  w h)) ps = unlines $ ["P1",show w ++ " " ++ show
 showText :: Show a => a -> Text
 showText = pack . show
 
-newLevelGen :: (MonadRandom m,MonadWriter [Text] m) => (Int,Int) -> Int -> [Platform] -> m [Platform]
-newLevelGen yrange maxLength startPlatforms =
+type PlatformYRange = (Int,Int)
+type PlatformXRange = (Int,Int)
+type PlatformMaxLength = Int
+type PlatformCount = Int                          
+type PlatformStartTime = TimeTicks                   
+type PlatformDeadline = TimeTicks                   
+type PlatformPosition = V2 Int
+
+newLevelGen :: (MonadRandom m,MonadWriter [Text] m) => PlatformYRange -> PlatformMaxLength -> PlatformStartTime -> [Platform] -> m [Platform]
+newLevelGen yrange maxLength startTime startPlatforms =
   case startPlatforms of
     [] -> do
       y <- getRandomR yrange
       let
         x = 0
-      p <- randomPlatformAt (V2 x y) maxLength
+      p <- randomPlatformAt (V2 x y) maxLength startTime
       tell ["newLevelGen: Initial platform is " <> showText p]
       return [p]
     plats -> do
       tell ["newLevelGen: Noninitial iteration, platforms: " <> showText plats]
       let
-        rightmost = maximum (map (\(Platform _ (V2 r _)) -> r) plats)
+        rightmost = maximum (view (platRight . _x) <$> plats)
+        maxDeadline = maximum (view platDeadline <$> plats)
+        newDeadline = maxDeadline `plusDuration` gcDeadlineIncrement
       tell ["newLevelGen: Rightmost: " <> showText rightmost]
       numberOfPlats <- getRandomR ((2,4) :: (Int,Int))
       tell ["newLevelGen: Number of plats: " <> showText numberOfPlats]
-      newPlatforms plats numberOfPlats (rightmost+2,rightmost+4) yrange maxLength
+      newPlatforms plats numberOfPlats (rightmost+2,rightmost+4) yrange maxLength newDeadline
 
-iterateNewPlatforms :: (MonadRandom m, MonadWriter [Text] m) => Int -> (Int, Int) -> Int -> m [Platform]
-iterateNewPlatforms count yrange maxLen = myIterate count (newLevelGen yrange maxLen)
+iterateNewPlatforms :: (MonadRandom m, MonadWriter [Text] m) => PlatformCount -> PlatformYRange -> PlatformMaxLength -> PlatformStartTime -> m [Platform]
+iterateNewPlatforms count yrange maxLen startTime = myIterate count (newLevelGen yrange maxLen startTime)
 
 myIterate :: (Semigroup t, Monoid t, Monad m) => Int -> (t -> m t) -> m t
 myIterate count g = f' count mempty
@@ -83,8 +90,8 @@ myIterate count g = f' count mempty
       rest <- f' (c-1) r
       return (r <> rest)
 
-newPlatforms :: (MonadRandom m,MonadWriter [Text] m) => [Platform] -> Int -> (Int,Int) -> (Int,Int) -> Int -> m [Platform]
-newPlatforms previous count' (xl,xr) (miny,maxy) maxLength = newPlatforms' count' [V2 x y | x <- [xl..xr], y <- [miny..maxy]]
+newPlatforms :: (MonadRandom m,MonadWriter [Text] m) => [Platform] -> PlatformCount -> PlatformXRange -> PlatformYRange -> PlatformMaxLength -> PlatformDeadline -> m [Platform]
+newPlatforms previous count' (xl,xr) (miny,maxy) maxLength deadline = newPlatforms' count' [V2 x y | x <- [xl..xr], y <- [miny..maxy]]
   where
     newPlatforms' 0 _ = do
       tell ["Pruning because count=0" ]
@@ -95,7 +102,7 @@ newPlatforms previous count' (xl,xr) (miny,maxy) maxLength = newPlatforms' count
     newPlatforms' count xyCombos = do
       pos <- randomElemM xyCombos
       tell ["newPlatforms: trying " <> showText pos]
-      p <- tryNewPlatform pos previous maxLength
+      p <- tryNewPlatform pos previous maxLength deadline
       case p of
         Nothing -> do
           tell ["newPlatforms: didn't work, removing " <> showText pos]
@@ -111,9 +118,9 @@ newPlatforms previous count' (xl,xr) (miny,maxy) maxLength = newPlatforms' count
           ps <- newPlatforms' (count-1) remaining
           return (p' : ps)
 
-tryNewPlatform :: (MonadRandom m,MonadWriter [Text] m) => V2 Int -> [Platform] -> Int -> m (Maybe Platform)
-tryNewPlatform pos previous maxLength = do
-  p <- randomPlatformAt pos maxLength
+tryNewPlatform :: (MonadRandom m,MonadWriter [Text] m) => PlatformPosition -> [Platform] -> PlatformMaxLength -> PlatformDeadline -> m (Maybe Platform)
+tryNewPlatform pos previous maxLength deadline = do
+  p <- randomPlatformAt pos maxLength deadline
   tell ["tryNewPlatform: generated " <> showText pos]
   if unreachable previous p
     then return Nothing
@@ -121,12 +128,12 @@ tryNewPlatform pos previous maxLength = do
 
 unreachable :: [Platform] -> Platform -> Bool
 unreachable ps p = not $ orEmptyTrue r
-  where r = pure (\p' -> platformReachable p' p) <*> ps
+  where r = pure (`platformReachable` p) <*> ps
 
-randomPlatformAt :: MonadRandom m => PointInt -> Int -> m Platform
-randomPlatformAt (V2 x y) maxLength = do
+randomPlatformAt :: MonadRandom m => PlatformPosition -> PlatformMaxLength -> PlatformDeadline -> m Platform
+randomPlatformAt (V2 x y) maxLength deadline = do
   plength <- getRandomR (1,maxLength)
-  return $ Platform (V2 x y) (V2 (x+plength) y)
+  return $ Platform (V2 x y) (V2 (x+plength) y) deadline 
 
 playerMaxJumpHeight :: Real
 playerMaxJumpHeight = -(gcJmp*gcJmp)/(2*(-gcGrv))
@@ -164,14 +171,15 @@ platformManhattanDistance p1 p2 =
     y = abs (pHeight p1 - pHeight p2)
   in V2 x y
 
+-- FIXME: Das könnten alles Lenses sein und sollten es
 pTiles :: Platform -> [PointInt]
-pTiles (Platform (V2  l0 t0) (V2  r0 _)) = [V2  x t0 | x <- [l0..r0]]
+pTiles (Platform (V2  l0 t0) (V2  r0 _) _) = [V2  x t0 | x <- [l0..r0]]
 
 pLeft :: Platform -> PointInt
-pLeft (Platform p _) = p
+pLeft (Platform p _ _) = p
 
 pHeight :: Platform -> Int
-pHeight (Platform (V2 _ y) _) = y
+pHeight (Platform (V2 _ y) _ _) = y
 
 pRight :: Platform -> PointInt
-pRight (Platform _ r) = r
+pRight (Platform _ r _) = r

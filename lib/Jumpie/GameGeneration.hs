@@ -53,9 +53,9 @@ tilesPerScreen = V2 (screenWidth `div` gcTileSize) (screenHeight `div` gcTileSiz
 --tilesRect :: RectInt
 --tilesRect = Rect (V2 1 1) (V2 (screenWidth `div` gcTileSize - 1) (screenHeight `div` gcTileSize - 1))
 
-platToBoxes :: TimeTicks -> [PointInt] -> Platform -> [Box]
-platToBoxes currentTicks plats (Platform (V2 l y) (V2 r _)) = map toBox [l..r]
-  where toBox x = Box (bpos x) (currentTicks `plusDuration` (fromSeconds 10)) (btype x)
+platToBoxes :: [PointInt] -> Platform -> [Box]
+platToBoxes plats (Platform (V2 l y) (V2 r _) deadline) = map toBox [l..r]
+  where toBox x = Box (bpos x) deadline (btype x)
         bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (V2 x y) (V2 (x+1) (y+1)))
         btype x
           | hasLeft && hasRight = BoxMiddle
@@ -80,11 +80,11 @@ type WorldSection = [GameObject]
 generateSection :: MonadRandom m => TimeTicks -> m WorldSection
 generateSection timeTicks = do
   let
-    platsAction = LG.iterateNewPlatforms 10 (0,tilesPerScreen ^. _y) gcPlatMaxLength
+    platsAction = LG.iterateNewPlatforms 10 (0,tilesPerScreen ^. _y - 1) gcPlatMaxLength timeTicks
   (plats,_) <- runWriterT platsAction
   let
     platformPoints = platsToPoints plats
-    boxes = ObjectBox <$> concatMap (platToBoxes timeTicks platformPoints) plats
+    boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
   return boxes
 
 sectionWidth :: WorldSection -> (Real,Real)
@@ -110,6 +110,6 @@ generateGame currentTicks = do
         _playerVelocity = V2 0.0 0.0,
         _playerWalkSince = Nothing
       }
-  secondSection <- generateSection (currentTicks `plusDuration` fromSeconds 20)
+  secondSection <- generateSection (currentTicks `plusDuration` fromSeconds 3)
   let (_,firstSectionEnd) = sectionWidth section
   return (player,[section,(moveSection (firstSectionEnd + (fromIntegral gcTileSize)) secondSection)])
