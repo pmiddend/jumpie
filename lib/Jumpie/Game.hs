@@ -9,6 +9,7 @@ import           Jumpie.GameConfig
 import Control.Lens.Fold(maximumOf,minimumOf)
 import           Jumpie.MonadGame
 import           Jumpie.GameObject
+import           Jumpie.Platform
 import           Jumpie.GameState
 import           Jumpie.GameGeneration
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
@@ -24,7 +25,7 @@ import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.),(^?!),_Just,use)
 import Wrench.Animation
 import Data.List(last)
-import Control.Lens((.=),(<>=),(-=))
+import Control.Lens((.=),(<>=),(%=))
 import Control.Monad.Random(MonadRandom)
 import Control.Monad.State.Strict(MonadState)
 import Control.Monad.Writer(MonadWriter)
@@ -44,15 +45,15 @@ type LastWorldSection = WorldSection
 
 shouldGenerateNewSection :: LastWorldSection -> Player -> Bool
 shouldGenerateNewSection lastSection player =
-  let maxBoxPosition = minimumOf (traverse . _ObjectBox . boxPosition . left) lastSection ^?! _Just
+  let maxBoxPosition = minimumOf (traverse . _ObjectPlatform . platLeftAbsReal) lastSection ^?! _Just
   in (abs ((player ^. playerPosition . _x) - maxBoxPosition)) < fromIntegral screenWidth
 
 generateNewSection :: (MonadRandom m,MonadGame m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
 generateNewSection lastSection = do
   maxDeadlinePrev <- use gsMaxDeadline
-  let lastSectionEnd = maximumOf (traverse . _ObjectBox . boxPosition . right) lastSection ^?! _Just
-  newSection <- moveSection (lastSectionEnd+fromIntegral gcTileSize) <$> generateSection maxDeadlinePrev
-  gsMaxDeadline .= maximumOf (traverse . _ObjectBox . boxDeadline) newSection ^?! _Just
+  let lastSectionEnd = maximumOf (traverse . _ObjectPlatform . platRight) lastSection ^?! _Just
+  newSection <- moveSection (TileIncrement (lastSectionEnd+1)) <$> generateSection maxDeadlinePrev
+  gsMaxDeadline .= maximumOf (traverse . _ObjectPlatform . platDeadline) newSection ^?! _Just
   gsSections <>= [newSection]
 
 updateSectionsAndPlayer :: (MonadIO m,MonadGame m, MonadWriter [OutgoingAction] m, MonadState GameState m, Applicative m) => [IncomingAction] -> m ()
@@ -83,10 +84,11 @@ processGameObjects actions = do
       let (newFirstSectionStart,_) = sectionBeginEnd newFirstSection
       tempSection <- use gsTempSection
       -- TODO: camera position only changes x value - better lens here
-      gsPlayer . playerPosition . _x -= newFirstSectionStart
+      gsPlayer %= (`moveObject` (-newFirstSectionStart))
+      --gsPlayer . playerPosition . _x -= newFirstSectionStart
       player <- use gsPlayer
       cameraPosition <- use gsCameraPosition
-      gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - newFirstSectionStart) (cameraPosition ^. _y)) (player ^. playerPosition) 
+      gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - (tileIncrementAbsReal newFirstSectionStart)) (cameraPosition ^. _y)) (player ^. playerPosition) 
       gsTempSection .= moveSection (-newFirstSectionStart) tempSection
       gsSections .= (moveSection (-newFirstSectionStart) <$> ss)
     _ -> do
@@ -103,11 +105,11 @@ processWorldSection actions section = do
 processGameObject :: (MonadIO m,Functor m,MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> GameObject -> m [GameObject]
 processGameObject _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
-  ObjectBox b -> do
+  ObjectPlatform b -> do
     ticks <- gcurrentTicks
-    if ticks > b ^. boxDeadline
+    if ticks > b ^. platDeadline
       then return []
-      else return [ObjectBox b]
+      else return [ObjectPlatform b]
   ObjectParticle b -> processParticle b
   ObjectSensorLine _ -> return []
 
@@ -133,13 +135,13 @@ processPlayerObject ias p = case p ^. playerMode of
 lineCollision :: [GameObject] -> LineSegmentReal -> Maybe GameObject
 lineCollision boxes l = (getFirst . mconcat . map (First . collides l)) boxes
   where collides :: LineSegmentReal -> GameObject -> Maybe GameObject
-        collides l1 bp@(ObjectBox b) = ifMaybe (rectLineSegmentIntersects 0.01 (b ^. boxPosition) l1) bp
+        collides l1 bp@(ObjectPlatform b) = ifMaybe (rectLineSegmentIntersects 0.01 (b ^. platRectAbsReal) l1) bp
         collides _ _ = Nothing
 
 
 applySensors :: [GameObject] -> PointReal -> Real -> Sensors
 applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fSRCollision cSLCollision cSRCollision
-  where boxes = filter isBox go
+  where boxes = filter isPlatform go
         wSCollision = lineCollision boxes wS
         wS = LineSegment (V2 wSL wSY) (V2 wSR wSY)
         wSY = (p ^. _y) + wSDev
@@ -171,12 +173,12 @@ processGroundPlayerObject ias p = do
                         then Air
                         else Ground
         newPlayerPositionX = case sensors ^. sensWCollision of
-          Just (ObjectBox (Box r _ _)) -> if r ^. center . _x < p ^. playerPosition . _x
-                                     then r ^. right + gcWSSize + 1.0
-                                     else r ^. left - (gcWSSize + 1.0)
+          Just (ObjectPlatform r) -> if r ^. platRectAbsReal . center . _x < p ^. playerPosition . _x
+                                     then r ^. platRectAbsReal . right + gcWSSize + 1.0
+                                     else r ^. platRectAbsReal . left - (gcWSSize + 1.0)
           _ -> p ^. playerPosition . _x + toSeconds t * p ^. playerVelocity ^. _x
         newPlayerPositionY = case fCollision of
-          Just (ObjectBox (Box r _ _)) -> r ^. top - gcPlayerHeight
+          Just (ObjectPlatform r) -> r ^. platRectAbsReal . top - gcPlayerHeight
           _ -> p ^. playerPosition . _y
         newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
         oldPlayerVelocityX = p ^. playerVelocity ^. _x
@@ -214,10 +216,10 @@ processAirPlayerObject ias p = do
     oldPlayerVelocityX = p ^. playerVelocity . _x
     oldPlayerVelocityY = p ^. playerVelocity . _y
     playerIsAboveBox b = case b of
-      (ObjectBox (Box r _ _)) -> oldPlayerPositionY - gcPlayerHeight < (r ^. bottom)
+      (ObjectPlatform r) -> oldPlayerPositionY - gcPlayerHeight < (r ^. platRectAbsReal . bottom)
       _ -> False
     playerIsBelowBox b = case b of
-      (ObjectBox (Box r _ _)) -> oldPlayerPositionY + gcPlayerHeight > (r ^. top)
+      (ObjectPlatform r) -> oldPlayerPositionY + gcPlayerHeight > (r ^. platRectAbsReal . top)
       _ -> False
     -- Ist der naechste Zustand der Bodenzustand?
     newPlayerMode = case fCollision of
@@ -230,13 +232,13 @@ processAirPlayerObject ias p = do
       then [ObjectParticle (Particle "dirt" (p ^. playerPosition) currentTicks')]
       else []
     newPlayerPositionX = case sensors ^. sensWCollision of
-      Just (ObjectBox (Box r _ _)) -> if r ^. center . _x < oldPlayerPositionX
-                                 then r ^. right  + gcWSSize + 1.0
-                                 else r ^. left - (gcWSSize + 1.0)
+      Just (ObjectPlatform r) -> if r ^. platRectAbsReal . center . _x < oldPlayerPositionX
+                                 then r ^. platRectAbsReal . right  + gcWSSize + 1.0
+                                 else r ^. platRectAbsReal . left - (gcWSSize + 1.0)
       _ -> oldPlayerPositionX + toSeconds t * oldPlayerVelocityX
     newPlayerPositionY = case cCollision of
-      Just b@(ObjectBox (Box r _ _)) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
-                                    then r ^. bottom + gcPlayerHeight
+      Just b@(ObjectPlatform r) -> if oldPlayerVelocityY < 0.0 && playerIsAboveBox b
+                                    then r ^. platRectAbsReal . bottom + gcPlayerHeight
                                     else oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
       _ -> oldPlayerPositionY + toSeconds t * oldPlayerVelocityY
     playerAcc

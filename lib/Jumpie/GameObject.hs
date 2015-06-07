@@ -1,44 +1,50 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Jumpie.GameObject(
   GameObject(..),
   PlayerMode(..),
-  BoxType(..),
   Player(..),
   SensorLine(SensorLine),
   Particle(..),
+  TileIncrement(..),
   MoveableObject(..),
   line,
-  maybeBox,
+  maybePlatform,
   playerPosition,
   playerMode,
   playerVelocity,
+  tileIncrementAbsReal,
   playerWalkSince,
-  boxPosition,
-  boxDeadline,
   particleInception,
   particleIdentifier,
-  _ObjectBox,
-  Box(..),
-  isBox,
+  _ObjectPlatform,
+  isPlatform,
   isParticle,
   isPlayer,
   isSensorLine
   ) where
 
 import           Jumpie.Geometry.LineSegment
-import           Jumpie.Geometry.Rect
-import           Jumpie.Types                (PointReal, RectReal)
+import           Jumpie.GameConfig
+import           Jumpie.Types                (PointReal, Real)
 import Wrench.Time
 import ClassyPrelude hiding(Real)
+import Jumpie.Platform
 import Wrench.AnimId
 import Control.Lens.TH
-import Control.Lens((&),(+~),(%~))
+import Linear.V2
+import Control.Lens((&),(+~))
 
 data PlayerMode = Ground | Air deriving(Eq,Show)
 
+newtype TileIncrement = TileIncrement { tileIncrementRelative :: Int } deriving(Num)
+
+tileIncrementAbsReal :: TileIncrement -> Real
+tileIncrementAbsReal = fromIntegral . (*gcTileSize) . tileIncrementRelative
+
 class MoveableObject p where
-  moveObject :: p -> PointReal -> p
+  moveObject :: p -> TileIncrement -> p
 
 data Player = Player {
     _playerPosition  :: PointReal
@@ -50,7 +56,7 @@ data Player = Player {
 $(makeClassy ''Player)
 
 instance MoveableObject Player where
-  moveObject p v = p & playerPosition +~ v
+  moveObject p v = p & playerPosition . _x +~ (tileIncrementAbsReal v)
 
 data Particle =
        Particle
@@ -63,40 +69,35 @@ data Particle =
 $(makeClassy ''Particle)
 
 instance MoveableObject Particle where
-  moveObject p v = p & particlePosition +~ v
+  moveObject p v = p & particlePosition . _x +~ (tileIncrementAbsReal v)
 
 newtype SensorLine = SensorLine { line :: LineSegment PointReal }
   deriving Show
 
+{-        
 data BoxType = BoxLeft
              | BoxRight
              | BoxSingleton
              | BoxMiddle
   deriving Show
+-}
 
-data Box = Box {
-    _boxPosition :: RectReal
-  , _boxDeadline :: TimeTicks
-  , _boxType :: BoxType
-  }
-  deriving Show
+instance MoveableObject Platform where
+  moveObject p v = p & platLeft +~ tileIncrementRelative v
 
-$(makeClassy ''Box)
-
-instance MoveableObject Box where
-  moveObject p v = p & boxPosition %~ (\o -> moveObject o v)
-
+{-
 instance MoveableObject RectReal where
-  moveObject p v = p & rectTopLeft +~ v & rectBottomRight +~ v
+  moveObject p v = p & rectTopLeft . _x +~ v & rectBottomRight . _x +~ v
+-}
 
 instance MoveableObject (LineSegment PointReal) where
-  moveObject p v = p & lineSegmentFrom +~ v & lineSegmentTo +~ v
+  moveObject p v = p & lineSegmentFrom . _x +~ tileIncrementAbsReal v & lineSegmentTo . _x +~ tileIncrementAbsReal v
 
 instance MoveableObject SensorLine where
   moveObject p v = SensorLine (moveObject (line p) v)
 
 data GameObject = ObjectPlayer Player
-                | ObjectBox Box
+                | ObjectPlatform Platform
                 | ObjectSensorLine SensorLine
                 | ObjectParticle Particle
   deriving(Show)
@@ -105,17 +106,17 @@ $(makePrisms ''GameObject)
 
 instance MoveableObject GameObject where
   moveObject (ObjectPlayer p) v = ObjectPlayer (moveObject p v)
-  moveObject (ObjectBox p) v = ObjectBox (moveObject p v)
+  moveObject (ObjectPlatform p) v = ObjectPlatform (moveObject p v)
   moveObject (ObjectSensorLine p) v = ObjectSensorLine (moveObject p v)
   moveObject (ObjectParticle p) v = ObjectParticle (moveObject p v)
 
-maybeBox :: GameObject -> Maybe Box
-maybeBox (ObjectBox b) = Just b
-maybeBox _ = Nothing
+maybePlatform :: GameObject -> Maybe Platform
+maybePlatform (ObjectPlatform b) = Just b
+maybePlatform _ = Nothing
 
-isBox :: GameObject -> Bool
-isBox (ObjectBox _) = True
-isBox _ = False
+isPlatform :: GameObject -> Bool
+isPlatform (ObjectPlatform _) = True
+isPlatform _ = False
 
 isPlayer :: GameObject -> Bool
 isPlayer (ObjectPlayer _) = True

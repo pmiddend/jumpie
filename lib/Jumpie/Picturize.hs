@@ -10,9 +10,9 @@ import           Jumpie.MonadGame
 import           Jumpie.GameObject
 import           Jumpie.GameState
 import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
-import           Jumpie.Geometry.Rect        (rectTopLeft)
 import Control.Lens((^.),(^?!),ix)
 import Wrench.ImageData
+import Jumpie.Platform
 import Wrench.SpriteIdentifier
 import Wrench.Animation
 import Wrench.Time
@@ -20,6 +20,21 @@ import Wrench.Picture
 import ClassyPrelude
 import Linear.V2
 import Wrench.RenderPositionMode
+
+{-
+platToBoxes :: [PointInt] -> Platform -> [Box]
+platToBoxes plats (Platform (V2 l y) (V2 r _) deadline) = map toBox [l..r]
+  where toBox x = Box (bpos x) deadline (btype x)
+        bpos x = (fmap . fmap) (fromIntegral . (*gcTileSize)) (Rect (V2 x y) (V2 (x+1) (y+1)))
+        btype x
+          | hasLeft && hasRight = BoxMiddle
+          | hasLeft = BoxLeft
+          | hasRight = BoxRight
+          | otherwise = BoxSingleton
+          where hasLeft = V2 (x - 1) y `elem` plats
+                hasRight = V2 (x + 1) y `elem` plats
+-}
+
 
 picturizeGameState :: (Monad m,Applicative m,MonadGame m) => GameState -> m Picture
 picturizeGameState gs = do
@@ -32,11 +47,11 @@ picturizeObject :: (Monad m,Applicative m,MonadGame m) => GameObject -> m Pictur
 picturizeObject ob = case ob of
   ObjectPlayer p -> picturizePlayer p
   ObjectSensorLine s -> picturizeLine s
-  ObjectBox b -> picturizeBox b
+  ObjectPlatform b -> picturizePlatform b
   ObjectParticle s -> picturizeParticle s
 
-picturizeBox :: (Applicative m,MonadGame m) => Box -> m Picture
-picturizeBox (Box p _ t) = pure ((p ^. rectTopLeft) `pictureTranslated` pictureSpriteTopLeft ("platform" ++ boxTypeToSuffix t))
+picturizePlatform :: (Applicative m,MonadGame m) => Platform -> m Picture
+picturizePlatform p = pure ((p ^. platLeftTopAbsReal) `pictureTranslated` pictureSpriteTopLeft ("platform" <> (pack (show (p ^. platLength)))))
 
 picturizeParticle :: (Functor m,Monad m,MonadGame m) => Particle -> m Picture
 picturizeParticle (Particle identifier pos inception) = do
@@ -47,12 +62,6 @@ picturizeParticle (Particle identifier pos inception) = do
 
 picturizeLine :: (Applicative m,MonadGame m) => SensorLine -> m Picture
 picturizeLine (SensorLine s) = pure (pictureLine (s ^. lineSegmentFrom) (s ^. lineSegmentTo))
-
-boxTypeToSuffix :: IsString s => BoxType -> s
-boxTypeToSuffix BoxMiddle = "m"
-boxTypeToSuffix BoxLeft = "l"
-boxTypeToSuffix BoxRight = "r"
-boxTypeToSuffix BoxSingleton = "s"
 
 currentAnimFrame :: TimeTicks -> TimeTicks -> Animation -> SpriteIdentifier
 currentAnimFrame animStart currentTicks' anim =

@@ -2,9 +2,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Jumpie.LevelGeneration(
   Platform(Platform),
-  pLeft,
-  pRight,
-  pTiles,
   showPlatforms,
   replaceNth,
   setPartList,
@@ -39,7 +36,13 @@ safeSearch s a = if length s <= a then error "Couldn't: \"" <> show a <> "\"" el
 showPlatforms :: RectInt -> [Platform] -> [String]
 showPlatforms r = showPlatforms' (replicate h (replicate w '0'))
   where showPlatforms' :: [String] -> [Platform] -> [String]
-        showPlatforms' s (Platform (V2  x0 y0) (V2  x1 _) _:ps) = showPlatforms' (replaceNth s y0 (setPartList (safeSearch s y0{-(s !! y0)-}) (x0,x1+1) '1')) ps
+        showPlatforms' s (p:ps) =
+          let
+            x0 = p ^. platLeft
+            y0 = p ^. platHeight
+            x1 = p ^. platRight
+          in
+            showPlatforms' (replaceNth s y0 (setPartList (safeSearch s y0) (x0,x1+1) '1')) ps
         showPlatforms' s [] = s
         (V2  w h) = r ^. dimensions
 
@@ -70,7 +73,7 @@ newLevelGen yrange maxLength startTime startPlatforms =
     plats -> do
       tell ["newLevelGen: Noninitial iteration, platforms: " <> showText plats]
       let
-        rightmost = maximum (view (platRight . _x) <$> plats)
+        rightmost = maximum (view platRight <$> plats)
         maxDeadline = maximum (view platDeadline <$> plats)
         newDeadline = maxDeadline `plusDuration` gcDeadlineIncrement
       tell ["newLevelGen: Rightmost: " <> showText rightmost]
@@ -133,7 +136,7 @@ unreachable ps p = not $ orEmptyTrue r
 randomPlatformAt :: MonadRandom m => PlatformPosition -> PlatformMaxLength -> PlatformDeadline -> m Platform
 randomPlatformAt (V2 x y) maxLength deadline = do
   plength <- getRandomR (1,maxLength)
-  return $ Platform (V2 x y) (V2 (x+plength) y) deadline 
+  return Platform { _platLeft = x, _platLength = plength, _platDeadline = deadline, _platHeight = y }
 
 playerMaxJumpHeight :: Real
 playerMaxJumpHeight = -(gcJmp*gcJmp)/(2*(-gcGrv))
@@ -142,10 +145,10 @@ playerMaxJumpWidth :: Real
 playerMaxJumpWidth = (2*(-gcJmp)*gcPlayerMaxSpeed)/gcGrv
 
 pHigher :: Platform -> Platform -> Bool
-pHigher p1 p2 = pHeight p1 > pHeight p2
+pHigher p1 p2 = p1 ^. platHeight > p2 ^. platHeight
 
 pLowerEqual :: Platform -> Platform -> Bool
-pLowerEqual p1 p2 = pHeight p1 <= pHeight p2
+pLowerEqual p1 p2 = p1 ^. platHeight <= p2 ^. platHeight
 
 platformReachable :: Platform -> Platform -> Bool
 platformReachable left right =
@@ -162,24 +165,11 @@ intervalDistance (a1,a2) (b1,b2) | a2 < b1 = b1 - a2
                                  | otherwise = 0
 
 pToXInterval :: Platform -> (Int,Int)
-pToXInterval p = (pLeft p ^. _x,pRight p ^. _x)
+pToXInterval p = (p ^. platLeft,p ^. platRight)
 
 platformManhattanDistance :: Platform -> Platform -> PointInt
 platformManhattanDistance p1 p2 =
   let
     x = intervalDistance (pToXInterval p1) (pToXInterval p2)
-    y = abs (pHeight p1 - pHeight p2)
+    y = abs (p1 ^. platHeight - p2 ^. platHeight)
   in V2 x y
-
--- FIXME: Das könnten alles Lenses sein und sollten es
-pTiles :: Platform -> [PointInt]
-pTiles (Platform (V2  l0 t0) (V2  r0 _) _) = [V2  x t0 | x <- [l0..r0]]
-
-pLeft :: Platform -> PointInt
-pLeft (Platform p _ _) = p
-
-pHeight :: Platform -> Int
-pHeight (Platform (V2 _ y) _ _) = y
-
-pRight :: Platform -> PointInt
-pRight (Platform _ r _) = r

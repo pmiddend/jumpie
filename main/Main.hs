@@ -8,6 +8,7 @@ import           Jumpie.Game
 import           Jumpie.GameGeneration
 import Jumpie.GameState
 import Jumpie.GameObject
+import Jumpie.Platform
 import Jumpie.MonadGame
 import Jumpie.Types
 import qualified Wrench.Keysym as KS
@@ -72,7 +73,7 @@ main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
         , _gsTempSection = []
         , _gsGameOver = False
         , _gsCameraPosition = V2 0 0
-        , _gsMaxDeadline = maximumOf (traverse . traverse . _ObjectBox . boxDeadline) sections ^?! _Just
+        , _gsMaxDeadline = maximumOf (traverse . traverse . _ObjectPlatform . platDeadline) sections ^?! _Just
         }
     lastGameState <- execStateT stageMainLoop initialGameState
     _ <- execStateT gameoverMainLoop lastGameState
