@@ -26,7 +26,7 @@ import Wrench.Animation
 import Data.List(last)
 import Control.Lens((.=),(<>=),(-=))
 import Control.Monad.Random(MonadRandom)
-import Control.Monad.State.Strict(gets,get,MonadState)
+import Control.Monad.State.Strict(MonadState)
 import Control.Monad.Writer(MonadWriter)
 
 updateCameraPosition :: PointReal -> PointReal -> PointReal
@@ -113,8 +113,8 @@ processGameObject _ o = case o of
 
 testGameOver :: MonadState GameState m => m Bool
 testGameOver = do
-  gs <- get
-  return ((gs ^. gsPlayer ^. playerPosition ^. _y) > fromIntegral screenHeight)
+  player <- use gsPlayer
+  return ((player ^. playerPosition ^. _y) > fromIntegral screenHeight)
 
 processParticle :: (Functor m,Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => Particle -> m [GameObject]
 processParticle b = do
@@ -163,9 +163,9 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
 processGroundPlayerObject :: (Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])
 processGroundPlayerObject ias p = do
   t <- gcurrentTimeDelta
-  gs <- get
+  objects <- use gsAllObjects
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensors ^. sensW,sensors ^. sensFL,sensors ^. sensFR,sensors ^. sensCL,sensors ^. sensCR]
-        sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 4.0
+        sensors = applySensors objects (p ^. playerPosition) 4.0
         fCollision = (sensors ^. sensFLCollision) <|> (sensors ^. sensFRCollision)
         newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
                         then Air
@@ -201,11 +201,11 @@ processGroundPlayerObject ias p = do
 processAirPlayerObject :: (Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])
 processAirPlayerObject ias p = do
   t <- gcurrentTimeDelta
-  gs <- get
+  objects <- use gsAllObjects
   currentTicks' <- gcurrentTicks
   let
     sensorLines = map (ObjectSensorLine . SensorLine) [sensors ^. sensW,sensors ^. sensFL,sensors ^. sensFR,sensors ^. sensCL,sensors ^. sensCR]
-    sensors = applySensors (gs ^. gsAllObjects) (p ^. playerPosition) 0.0
+    sensors = applySensors objects (p ^. playerPosition) 0.0
     fCollision = (sensors ^. sensFLCollision) <|> (sensors ^. sensFRCollision)
     cCollision = (sensors ^. sensCLCollision) <|> (sensors ^. sensCRCollision)
     movingDownwards = p ^. playerVelocity . _y >= 0.0
