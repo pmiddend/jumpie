@@ -1,6 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
-{-# LANGUAGE NoImplicitPrelude          #-}
 module Jumpie.MonadGame(
     GameData
   , MonadGame(..)
@@ -114,14 +113,13 @@ instance Platform p => MonadGame (GameDataM p) where
     surfaces <- gets gdSurfaces
     return (snd <$> (sid `lookup` surfaces))
 
+processKeydown :: Event -> Keydowns -> Keydowns
+processKeydown (Keyboard KeyUp _ keysym) = S.delete keysym
+processKeydown (Keyboard KeyDown _ keysym) = S.insert keysym
+processKeydown _ = id
+
 processKeydowns :: Keydowns -> [Event] -> Keydowns
-processKeydowns k es = (k \\ keyUps) `union` keyDowns
-  where keyUps = S.fromList (es >>= keyUpSym)
-        keyDowns = S.fromList (es >>= keyDownSym)
-        keyUpSym (Keyboard KeyUp _ keysym) = [keysym]
-        keyUpSym _ = []
-        keyDownSym (Keyboard KeyDown _ keysym) = [keysym]
-        keyDownSym _ = []
+processKeydowns k es = foldr processKeydown k es
 
 runGame :: P.WindowTitle -> P.WindowSize -> GameDataM PlatformBackend () -> IO ()
 runGame title size action = withPlatform title size $
