@@ -41,10 +41,10 @@ class MonadGame m where
   glookupImageRectangle :: ImageId -> m (Maybe Rectangle)
 
 glookupAnimUnsafe :: (Functor m,MonadGame m) => AnimId -> m Animation 
-glookupAnimUnsafe anim = fromJust <$> (glookupAnim anim)
+glookupAnimUnsafe anim = fromJust <$> glookupAnim anim
 
 glookupImageRectangleUnsafe :: (Functor m,MonadGame m) => ImageId -> m Rectangle
-glookupImageRectangleUnsafe im = fromJust <$> (glookupImageRectangle im)
+glookupImageRectangleUnsafe im = fromJust <$> glookupImageRectangle im
 
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (P.PlatformImage p)
@@ -92,7 +92,7 @@ instance Platform p => MonadGame (GameDataM p) where
     s <- get
     put s {
         gdCurrentTicks = newTicks,
-        gdTimeDelta = (fromSeconds gcTimeMultiplier) * (newTicks `tickDelta` oldTicks)
+        gdTimeDelta = fromSeconds gcTimeMultiplier * (newTicks `tickDelta` oldTicks)
         }
   gupdateKeydowns events = do
     oldKeydowns <- gets gdKeydowns
@@ -119,7 +119,7 @@ processKeydown (Keyboard KeyDown _ keysym) = S.insert keysym
 processKeydown _ = id
 
 processKeydowns :: Keydowns -> [Event] -> Keydowns
-processKeydowns k es = foldr processKeydown k es
+processKeydowns = foldr processKeydown
 
 runGame :: P.WindowTitle -> P.WindowSize -> GameDataM PlatformBackend () -> IO ()
 runGame title size action = withPlatform title size $
