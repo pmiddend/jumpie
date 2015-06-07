@@ -49,21 +49,11 @@ shouldGenerateNewSection lastSection player =
 
 generateNewSection :: (MonadRandom m,MonadGame m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
 generateNewSection lastSection = do
-  putStrLn "Generating new section"
   maxDeadlinePrev <- use gsMaxDeadline
-  ticks <- gcurrentTicks
-  putStrLn $ "Current time: " <> pack (show ticks)
-  putStrLn $ "Old max deadline: " <> pack (show maxDeadlinePrev)
   let lastSectionEnd = maximumOf (traverse . _ObjectBox . boxPosition . right) lastSection ^?! _Just
-  putStrLn $ "Last section end: " <> pack (show lastSectionEnd)
   newSection <- moveSection (lastSectionEnd+fromIntegral gcTileSize) <$> generateSection maxDeadlinePrev
-  putStrLn $ "New section end: " <> pack (show (maximumOf (traverse . _ObjectBox . boxPosition . right) newSection))
   gsMaxDeadline .= maximumOf (traverse . _ObjectBox . boxDeadline) newSection ^?! _Just
-  maxDeadlineNew <- use gsMaxDeadline
-  putStrLn $ "New max deadline: " <> pack (show maxDeadlineNew)
   gsSections <>= [newSection]
-  newSections <- use gsSections
-  putStrLn $ "Number of sections: " <> (pack (show (length newSections)))
 
 updateSectionsAndPlayer :: (MonadIO m,MonadGame m, MonadWriter [OutgoingAction] m, MonadState GameState m, Applicative m) => [IncomingAction] -> m ()
 updateSectionsAndPlayer actions = do
@@ -93,12 +83,12 @@ processGameObjects actions = do
       let (newFirstSectionStart,_) = sectionBeginEnd newFirstSection
       tempSection <- use gsTempSection
       -- TODO: camera position only changes x value - better lens here
-      cameraPosition <- use gsCameraPosition
+      gsPlayer . playerPosition . _x -= newFirstSectionStart
       player <- use gsPlayer
+      cameraPosition <- use gsCameraPosition
       gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - newFirstSectionStart) (cameraPosition ^. _y)) (player ^. playerPosition) 
       gsTempSection .= moveSection (-newFirstSectionStart) tempSection
       gsSections .= (moveSection (-newFirstSectionStart) <$> ss)
-      gsPlayer . playerPosition . _x -= newFirstSectionStart
     _ -> do
       player <- use gsPlayer
       cameraPosition <- use gsCameraPosition
