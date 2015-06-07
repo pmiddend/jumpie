@@ -4,7 +4,7 @@ module Jumpie.GameGeneration(
     generateGame
   , generateSection
   , moveSection
-  , sectionWidth
+  , sectionBeginEnd
   , WorldSection
   ) where
 
@@ -87,8 +87,8 @@ generateSection timeTicks = do
     boxes = ObjectBox <$> concatMap (platToBoxes platformPoints) plats
   return boxes
 
-sectionWidth :: WorldSection -> (Real,Real)
-sectionWidth objects =
+sectionBeginEnd :: WorldSection -> (Real,Real)
+sectionBeginEnd objects =
   let boxes = view boxPosition <$> (mapMaybe maybeBox objects)
       minPos = minimum (view (rectTopLeft . _x) <$> boxes)
       maxPos = maximum (view (rectBottomRight . _x) <$> boxes)
@@ -111,5 +111,5 @@ generateGame currentTicks = do
         _playerWalkSince = Nothing
       }
   secondSection <- generateSection (currentTicks `plusDuration` fromSeconds 3)
-  let (_,firstSectionEnd) = sectionWidth section
+  let (_,firstSectionEnd) = sectionBeginEnd section
   return (player,[section,(moveSection (firstSectionEnd + (fromIntegral gcTileSize)) secondSection)])

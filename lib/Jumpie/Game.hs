@@ -6,7 +6,7 @@ import           Data.Maybe                   (fromJust)
 import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
 import           Jumpie.GameConfig
-import Control.Lens.Fold(maximumOf)
+import Control.Lens.Fold(maximumOf,minimumOf)
 import           Jumpie.MonadGame
 import           Jumpie.GameObject
 import           Jumpie.GameState
@@ -40,43 +40,57 @@ updateCameraPosition cameraPos playerPos =
   in
     V2 x (cameraPos ^. _y)
 
-shouldGenerateNewSection :: MonoFoldable c => [c] -> Bool
-shouldGenerateNewSection xs =
-  case xs of
-   [] -> True
-   (firstSection:_) -> length firstSection < 10
+type LastWorldSection = WorldSection
+
+shouldGenerateNewSection :: LastWorldSection -> Player -> Bool
+shouldGenerateNewSection lastSection player =
+  let maxBoxPosition = minimumOf (traverse . _ObjectBox . boxPosition . left) lastSection ^?! _Just
+  in (abs ((player ^. playerPosition . _x) - maxBoxPosition)) < fromIntegral screenWidth
 
 generateNewSection :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
 generateNewSection lastSection = do
   putStrLn "Generating new section"
   maxDeadlinePrev <- use gsMaxDeadline
-  let (_,lastSectionEnd) = sectionWidth lastSection
-  newSection <- moveSection (lastSectionEnd+fromIntegral gcTileSize) <$> (generateSection maxDeadlinePrev)
+  let lastSectionEnd = maximumOf (traverse . _ObjectBox . boxPosition . right) lastSection ^?! _Just
+  putStrLn $ "Last section end: " <> pack (show lastSectionEnd)
+  newSection <- moveSection (lastSectionEnd+fromIntegral gcTileSize) <$> generateSection maxDeadlinePrev
+  putStrLn $ "New section end: " <> pack (show (maximumOf (traverse . _ObjectBox . boxPosition . right) newSection))
   gsMaxDeadline .= maximumOf (traverse . _ObjectBox . boxDeadline) newSection ^?! _Just
   gsSections <>= [newSection]
 
+updateSectionsAndPlayer :: (MonadGame m, MonadWriter [OutgoingAction] m, MonadState GameState m, Applicative m) => [IncomingAction] -> m ()
+updateSectionsAndPlayer actions = do
+  newSections <- traverse (processWorldSection actions) =<< use gsSections 
+  gsSections .= newSections
+  newTempSection <- processWorldSection actions =<< use gsTempSection 
+  gsTempSection .= newTempSection
+  (newPlayer,playerObjects) <- processPlayerObject actions =<< use gsPlayer
+  gsTempSection <>= playerObjects
+  gsPlayer .= newPlayer
+
+maybeGenerateNewSection :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => m ()
+maybeGenerateNewSection = do
+  sections <- use gsSections
+  player <- use gsPlayer
+  when (shouldGenerateNewSection (last sections) player) (generateNewSection (last sections))
+
 processGameObjects :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> m ()
 processGameObjects actions = do
-  sections <- traverse (processWorldSection actions) =<< use gsSections
-  newTempSection <- processWorldSection actions =<< use gsTempSection
-  (newPlayer,playerObjects) <- processPlayerObject actions =<< use gsPlayer
-  gsPlayer .= newPlayer
-  when (shouldGenerateNewSection sections) (generateNewSection (last sections))
+  updateSectionsAndPlayer actions
+  maybeGenerateNewSection
+  sections <- use gsSections
   case sections of
     [] -> error "Empty list of sections"
-    []:(newFirstSection:tailSections) -> do
-      let
-        (newFirstSectionStart,_) = sectionWidth newFirstSection
-        newTempSectionMoved = moveSection newFirstSectionStart newTempSection
-        movedTails = (moveSection newFirstSectionStart) <$> tailSections
+    []:ss@(newFirstSection:_) -> do
+      let (newFirstSectionStart,_) = sectionBeginEnd newFirstSection
+      tempSection <- use gsTempSection
       -- TODO: camera position only changes x value - better lens here
       cameraPosition <- use gsCameraPosition
-      gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - newFirstSectionStart) (cameraPosition ^. _y)) (newPlayer ^. playerPosition) 
-      gsTempSection .= newTempSectionMoved
-      gsSections .= newFirstSection : movedTails
-      return ()
+      player <- use gsPlayer
+      gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - newFirstSectionStart) (cameraPosition ^. _y)) (player ^. playerPosition) 
+      gsTempSection .= moveSection (-newFirstSectionStart) tempSection
+      gsSections .= (moveSection (-newFirstSectionStart) <$> ss)
     (firstSection:tailSections) -> do
-      gsTempSection .= newTempSection <> playerObjects
       player <- gets _gsPlayer
       cameraPosition <- use gsCameraPosition
       gsCameraPosition .= updateCameraPosition cameraPosition (player ^. playerPosition) 
