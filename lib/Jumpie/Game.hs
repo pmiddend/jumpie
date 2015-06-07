@@ -24,7 +24,7 @@ import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.),(^?!),_Just,use)
 import Wrench.Animation
 import Data.List(last)
-import Control.Lens((.=),(<>=))
+import Control.Lens((.=),(<>=),(-=))
 import Control.Monad.Random(MonadRandom)
 import Control.Monad.State.Strict(gets,get,MonadState)
 import Control.Monad.Writer(MonadWriter)
@@ -47,18 +47,25 @@ shouldGenerateNewSection lastSection player =
   let maxBoxPosition = minimumOf (traverse . _ObjectBox . boxPosition . left) lastSection ^?! _Just
   in (abs ((player ^. playerPosition . _x) - maxBoxPosition)) < fromIntegral screenWidth
 
-generateNewSection :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
+generateNewSection :: (MonadRandom m,MonadGame m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
 generateNewSection lastSection = do
   putStrLn "Generating new section"
   maxDeadlinePrev <- use gsMaxDeadline
+  ticks <- gcurrentTicks
+  putStrLn $ "Current time: " <> pack (show ticks)
+  putStrLn $ "Old max deadline: " <> pack (show maxDeadlinePrev)
   let lastSectionEnd = maximumOf (traverse . _ObjectBox . boxPosition . right) lastSection ^?! _Just
   putStrLn $ "Last section end: " <> pack (show lastSectionEnd)
   newSection <- moveSection (lastSectionEnd+fromIntegral gcTileSize) <$> generateSection maxDeadlinePrev
   putStrLn $ "New section end: " <> pack (show (maximumOf (traverse . _ObjectBox . boxPosition . right) newSection))
   gsMaxDeadline .= maximumOf (traverse . _ObjectBox . boxDeadline) newSection ^?! _Just
+  maxDeadlineNew <- use gsMaxDeadline
+  putStrLn $ "New max deadline: " <> pack (show maxDeadlineNew)
   gsSections <>= [newSection]
+  newSections <- use gsSections
+  putStrLn $ "Number of sections: " <> (pack (show (length newSections)))
 
-updateSectionsAndPlayer :: (MonadGame m, MonadWriter [OutgoingAction] m, MonadState GameState m, Applicative m) => [IncomingAction] -> m ()
+updateSectionsAndPlayer :: (MonadIO m,MonadGame m, MonadWriter [OutgoingAction] m, MonadState GameState m, Applicative m) => [IncomingAction] -> m ()
 updateSectionsAndPlayer actions = do
   newSections <- traverse (processWorldSection actions) =<< use gsSections 
   gsSections .= newSections
@@ -82,6 +89,7 @@ processGameObjects actions = do
   case sections of
     [] -> error "Empty list of sections"
     []:ss@(newFirstSection:_) -> do
+      putStrLn "Moving sections"
       let (newFirstSectionStart,_) = sectionBeginEnd newFirstSection
       tempSection <- use gsTempSection
       -- TODO: camera position only changes x value - better lens here
@@ -90,20 +98,19 @@ processGameObjects actions = do
       gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - newFirstSectionStart) (cameraPosition ^. _y)) (player ^. playerPosition) 
       gsTempSection .= moveSection (-newFirstSectionStart) tempSection
       gsSections .= (moveSection (-newFirstSectionStart) <$> ss)
-    (firstSection:tailSections) -> do
-      player <- gets _gsPlayer
+      gsPlayer . playerPosition . _x -= newFirstSectionStart
+    _ -> do
+      player <- use gsPlayer
       cameraPosition <- use gsCameraPosition
       gsCameraPosition .= updateCameraPosition cameraPosition (player ^. playerPosition) 
-      gsSections .= firstSection : tailSections
-      return ()
   
 
-processWorldSection :: (Monad m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> WorldSection -> m WorldSection
+processWorldSection :: (Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> WorldSection -> m WorldSection
 processWorldSection actions section = do
   objects <- traverse (processGameObject actions) section
   return (concat objects)
 
-processGameObject :: (Functor m,MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> GameObject -> m [GameObject]
+processGameObject :: (MonadIO m,Functor m,MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> GameObject -> m [GameObject]
 processGameObject _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
   ObjectBox b -> do

@@ -80,7 +80,7 @@ type WorldSection = [GameObject]
 generateSection :: MonadRandom m => TimeTicks -> m WorldSection
 generateSection timeTicks = do
   let
-    platsAction = LG.iterateNewPlatforms 10 (0,tilesPerScreen ^. _y - 1) gcPlatMaxLength timeTicks
+    platsAction = LG.iterateNewPlatforms 10 (1,tilesPerScreen ^. _y) gcPlatMaxLength timeTicks
   (plats,_) <- runWriterT platsAction
   let
     platformPoints = platsToPoints plats
@@ -110,6 +110,4 @@ generateGame currentTicks = do
         _playerVelocity = V2 0.0 0.0,
         _playerWalkSince = Nothing
       }
-  secondSection <- generateSection (currentTicks `plusDuration` fromSeconds 3)
-  let (_,firstSectionEnd) = sectionBeginEnd section
-  return (player,[section,(moveSection (firstSectionEnd + (fromIntegral gcTileSize)) secondSection)])
+  return (player,[section])
