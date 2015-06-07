@@ -11,6 +11,7 @@ module Jumpie.MonadGame(
 
 import           Control.Monad.State.Strict (MonadState, StateT, evalStateT,
                                              get, gets, put)
+import           Control.Monad.Writer.Lazy (WriterT)
 import qualified Data.Set                   as S
 import           ClassyPrelude
 import Data.Maybe(fromJust)
@@ -61,6 +62,17 @@ newtype GameDataM p a = GameDataM {
   } deriving(Monad,MonadRandom,MonadIO,MonadState (GameData p),Applicative,Functor)
 
 instance (Monad m,MonadGame m) => MonadGame (StateT n m) where
+  gpollEvents = lift gpollEvents
+  gupdateTicks = lift gupdateTicks
+  gupdateKeydowns e = lift (gupdateKeydowns e)
+  gcurrentTicks = lift gcurrentTicks
+  gcurrentTimeDelta = lift gcurrentTimeDelta
+  gcurrentKeydowns = lift gcurrentKeydowns
+  grender p = lift (grender p)
+  glookupAnim aid = lift (glookupAnim aid)
+  glookupImageRectangle i = lift (glookupImageRectangle i)
+
+instance (Monad m,MonadGame m,Monoid w) => MonadGame (WriterT w m) where
   gpollEvents = lift gpollEvents
   gupdateTicks = lift gupdateTicks
   gupdateKeydowns e = lift (gupdateKeydowns e)

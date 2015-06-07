@@ -20,6 +20,7 @@ import Control.Lens.Fold(maximumOf)
 import Linear.V2
 import Control.Monad.Random       (MonadRandom)
 import Control.Monad.State.Strict(get,MonadState,execStateT)
+import Control.Monad.Writer(runWriterT)
 
 gameoverMainLoop :: (Monad m,Applicative m,MonadState GameState m,MonadGame m) => m ()
 gameoverMainLoop = do
@@ -39,7 +40,7 @@ stageMainLoop = do
   unless (outerGameOver events || gameOverBefore) $ do
     kds <- gcurrentKeydowns
     let incomingActions = concatMap kdToAction kds
-    _ <- processGameObjects incomingActions
+    _ <- runWriterT (processGameObjects incomingActions)
     go <- testGameOver
     gsGameOver .= go
     grender =<< picturizeGameState =<< get
