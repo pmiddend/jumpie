@@ -62,10 +62,10 @@ randomStar ticks xs = do
 
 type WorldSection = [GameObject]
 
-generateSection :: MonadRandom m => TimeTicks -> m WorldSection
-generateSection timeTicks = do
+generateSection :: MonadRandom m => TimeTicks -> [Platform] -> m WorldSection
+generateSection timeTicks prevPlats = do
   let
-    platsAction = LG.iterateNewPlatforms 10 (1,tilesPerScreen ^. _y) gcPlatMaxLength timeTicks
+    platsAction = LG.iterateNewPlatforms 1 (1,tilesPerScreen ^. _y) gcPlatMaxLength timeTicks prevPlats 
   (plats,_) <- runWriterT platsAction
   let
     boxes = ObjectPlatform <$> plats
@@ -83,7 +83,7 @@ moveSection r s = (`moveObject` r) <$> s
 
 generateGame :: MonadRandom m => TimeTicks -> m (Player,[WorldSection])
 generateGame currentTicks = do
-  section <- generateSection currentTicks
+  section <- generateSection currentTicks []
   let
     firstBox = head (sortBy (comparing (view platLeft)) (mapMaybe maybePlatform section))
     rawPlayerPos = abovePlatPosition firstBox

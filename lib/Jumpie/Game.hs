@@ -50,9 +50,11 @@ shouldGenerateNewSection lastSection player =
 
 generateNewSection :: (MonadRandom m,MonadGame m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
 generateNewSection lastSection = do
+  putStrLn "Generating new section"
   maxDeadlinePrev <- use gsMaxDeadline
-  let lastSectionEnd = maximumOf (traverse . _ObjectPlatform . platRight) lastSection ^?! _Just
-  newSection <- moveSection (TileIncrement (lastSectionEnd+1)) <$> generateSection maxDeadlinePrev
+  --let lastSectionEnd = maximumOf (traverse . _ObjectPlatform . platRight) lastSection ^?! _Just
+  --newSection <- moveSection (TileIncrement (lastSectionEnd+1)) <$> generateSection maxDeadlinePrev (mapMaybe maybePlatform lastSection)
+  newSection <- generateSection maxDeadlinePrev (mapMaybe maybePlatform lastSection)
   gsMaxDeadline .= maximumOf (traverse . _ObjectPlatform . platDeadline) newSection ^?! _Just
   gsSections <>= [newSection]
 
