@@ -22,7 +22,7 @@ mediaDir :: String
 mediaDir = "media"
 
 gcPlatMaxLength :: Int
-gcPlatMaxLength = 5
+gcPlatMaxLength = 2
 
 gcStarWiggleHeight :: Real
 gcStarWiggleHeight = 5

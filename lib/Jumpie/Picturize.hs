@@ -50,8 +50,18 @@ picturizeObject ob = case ob of
   ObjectPlatform b -> picturizePlatform b
   ObjectParticle s -> picturizeParticle s
 
-picturizePlatform :: (Applicative m,MonadGame m) => Platform -> m Picture
-picturizePlatform p = pure ((p ^. platLeftTopAbsReal) `pictureTranslated` pictureSpriteTopLeft ("platform" <> (pack (show (p ^. platLength)))))
+picturizePlatform :: (MonadGame m,Monad m,Functor m) => Platform -> m Picture
+picturizePlatform p = do
+  ticks <- gcurrentTicks
+  let
+    platLen = pack (show (p ^. platLength))
+    platTopLeft = (p ^. platLeftTopAbsReal)
+  if ticks < p ^. platDeadline
+    then return (platTopLeft `pictureTranslated` pictureSpriteTopLeft ("platform" <> platLen))
+    else do
+      anim <- glookupAnimUnsafe ("platform" <> platLen <> "_crack")
+      let image = currentAnimFrame (p ^. platDeadline) ticks anim
+      return (platTopLeft `pictureTranslated` pictureSpriteTopLeft image)
 
 picturizeParticle :: (Functor m,Monad m,MonadGame m) => Particle -> m Picture
 picturizeParticle (Particle identifier pos inception) = do

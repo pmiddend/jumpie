@@ -107,11 +107,12 @@ processWorldSection actions section = do
 processGameObject :: (MonadIO m,Functor m,MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> GameObject -> m [GameObject]
 processGameObject _ o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
-  ObjectPlatform b -> do
+  ObjectPlatform p -> do
     ticks <- gcurrentTicks
-    if ticks > b ^. platDeadline
+    anim <- glookupAnimUnsafe $ "platform" <> (pack (show (p ^. platLength))) <> "_crack"
+    if ticks > (p ^. platDeadline) `plusDuration` (anim ^. animLifetime)
       then return []
-      else return [ObjectPlatform b]
+      else return [ObjectPlatform p]
   ObjectParticle b -> processParticle b
   ObjectSensorLine _ -> return []
 

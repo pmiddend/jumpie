@@ -1,0 +1,10 @@
+platform1_crack_0=0,0,35,35
+platform1_crack_1=36,0,71,35
+platform1_crack_2=72,0,107,35
+platform1_crack_3=108,0,143,35
+>platform1_crack=250|platform1_crack_0,platform1_crack_1,platform1_crack_2,platform1_crack_3
+platform2_crack_0=0,36,70,71
+platform2_crack_1=72,36,141,71
+platform2_crack_2=143,36,212,71
+platform2_crack_3=214,36,283,71
+>platform2_crack=250|platform2_crack_0,platform2_crack_1,platform2_crack_2,platform2_crack_3
