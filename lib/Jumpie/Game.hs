@@ -266,4 +266,5 @@ processAirPlayerObject ias p = do
       _playerVelocity = V2 newPlayerVelocityX newPlayerVelocityY,
       _playerWalkSince = if newPlayerMode == Ground then Just currentTicks' else Nothing
       }
+  when (newPlayerMode == Ground) (gplaySound "landing")
   return (np,dirt <> sensorLines)

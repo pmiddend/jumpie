@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
 module Jumpie.MonadGame(
     GameData
@@ -12,18 +13,22 @@ import           Control.Monad.State.Strict (MonadState, StateT, evalStateT,
                                              get, gets, put)
 import           Control.Monad.Writer.Lazy (WriterT)
 import qualified Data.Set                   as S
-import           ClassyPrelude
+import           ClassyPrelude hiding((</>))
 import Data.Maybe(fromJust)
 import           Jumpie.GameConfig
 import           Jumpie.Types               (Keydowns)
 import           Wrench.Animation
 import           Wrench.AnimId
 import           Wrench.Engine
+import           Wrench.AudioData
 import           Wrench.ImageData
+import System.FilePath
 import           Wrench.KeyMovement
+import           Wrench.PlayMode
 import           Wrench.Picture
 import           Wrench.Platform            (Platform)
 import qualified Wrench.Platform            as P
+import qualified Data.Map.Strict as M
 import           Wrench.Rectangle
 import           Wrench.Time
 import System.Random(StdGen,getStdGen)
@@ -32,6 +37,7 @@ import Control.Monad.Random(MonadRandom(..),RandT,evalRandT)
 class MonadGame m where
   gpollEvents :: m [Event]
   gupdateTicks :: m ()
+  gplaySound :: SoundId -> m ()
   gupdateKeydowns :: [Event] -> m ()
   gcurrentTicks :: m TimeTicks
   gcurrentTimeDelta :: m TimeDelta
@@ -48,6 +54,8 @@ glookupImageRectangleUnsafe im = fromJust <$> glookupImageRectangle im
 
 data GameData p = GameData {
     gdSurfaces     :: SurfaceMap (P.PlatformImage p)
+  , gdSounds       :: SoundMap (P.PlatformAudioBuffer p)
+  , gdSources      :: [P.PlatformAudioSource p]
   , gdAnims        :: AnimMap
   , gdPlatform     :: p
   , gdCurrentTicks :: !TimeTicks
@@ -62,6 +70,7 @@ newtype GameDataM p a = GameDataM {
 
 instance (Monad m,MonadGame m) => MonadGame (StateT n m) where
   gpollEvents = lift gpollEvents
+  gplaySound s = lift (gplaySound s)
   gupdateTicks = lift gupdateTicks
   gupdateKeydowns e = lift (gupdateKeydowns e)
   gcurrentTicks = lift gcurrentTicks
@@ -74,6 +83,7 @@ instance (Monad m,MonadGame m) => MonadGame (StateT n m) where
 instance (Monad m,MonadGame m,Monoid w) => MonadGame (WriterT w m) where
   gpollEvents = lift gpollEvents
   gupdateTicks = lift gupdateTicks
+  gplaySound s = lift (gplaySound s)
   gupdateKeydowns e = lift (gupdateKeydowns e)
   gcurrentTicks = lift gcurrentTicks
   gcurrentTimeDelta = lift gcurrentTimeDelta
@@ -83,6 +93,12 @@ instance (Monad m,MonadGame m,Monoid w) => MonadGame (WriterT w m) where
   glookupImageRectangle i = lift (glookupImageRectangle i)
 
 instance Platform p => MonadGame (GameDataM p) where
+  gplaySound s = do
+    p <- gets gdPlatform
+    sounds <- gets gdSounds
+    case s `M.lookup` sounds of
+      Nothing -> error $ "Sound " <> unpack s <> " not found"
+      Just buffer -> void (liftIO (P.playBuffer p buffer PlayModeOnce))
   gpollEvents = do
     p <- gets gdPlatform
     liftIO $ P.pollEvents p
@@ -124,12 +140,16 @@ processKeydowns = foldr processKeydown
 runGame :: P.WindowTitle -> P.WindowSize -> GameDataM PlatformBackend () -> IO ()
 runGame title size action = withPlatform title size $
   \platform -> do
-    (images, anims) <- readMediaFiles (P.loadImage platform) mediaDir
+    (images, anims) <- readMediaFiles (P.loadImage platform) (mediaDir </> "images")
+    sounds <- readAudioFiles (P.loadAudio platform) (mediaDir </> "sounds")
+    print (M.keys sounds)
     ticks <- getTicks
-    font <- P.loadFont platform (mediaDir <> "/stdfont.ttf") 15
+    font <- P.loadFont platform (mediaDir </> "fonts" </> "stdfont.ttf") 15
     let
       gameData = GameData {
           gdSurfaces = images
+        , gdSounds = sounds
+        , gdSources = []
         , gdAnims = anims
         , gdPlatform = platform
         , gdCurrentTicks = ticks
