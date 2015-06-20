@@ -1,6 +1,6 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE MultiParamTypeClasses      #-}
+{-# LANGUAGE OverloadedStrings      #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving      #-}
 module Jumpie.MonadGame(
     GameData
   , MonadGame(..)
@@ -10,7 +10,7 @@ module Jumpie.MonadGame(
   ) where
 
 import           Control.Monad.State.Strict (MonadState, StateT, evalStateT,
-                                             get, gets, put)
+                                             get, gets, put,modify)
 import           Control.Monad.Writer.Lazy (WriterT)
 import qualified Data.Set                   as S
 import           ClassyPrelude hiding((</>))
@@ -98,7 +98,13 @@ instance Platform p => MonadGame (GameDataM p) where
     sounds <- gets gdSounds
     case s `M.lookup` sounds of
       Nothing -> error $ "Sound " <> unpack s <> " not found"
-      Just buffer -> void (liftIO (P.playBuffer p buffer PlayModeOnce))
+      Just buffer -> do
+        source <- liftIO (P.playBuffer p buffer PlayModeOnce)
+        -- TODO: This might be cleaner with lenses
+        sources <- gets gdSources
+        sourcesWithState <- traverse (\ts -> (liftIO (P.sourceIsStopped p ts)) >>= (\stopState -> return (ts,stopState))) sources
+        mapM_ (\ts -> liftIO (P.freeSource p (fst ts))) (filter snd sourcesWithState)
+        modify (\oldState -> oldState { gdSources = source : (map fst . filter (not . snd) $ sourcesWithState) })
   gpollEvents = do
     p <- gets gdPlatform
     liftIO $ P.pollEvents p
@@ -142,7 +148,7 @@ runGame title size action = withPlatform title size $
   \platform -> do
     (images, anims) <- readMediaFiles (P.loadImage platform) (mediaDir </> "images")
     sounds <- readAudioFiles (P.loadAudio platform) (mediaDir </> "sounds")
-    print (M.keys sounds)
+    putStrLn $ "Loaded the following sounds: " <> (intercalate ", " (M.keys sounds))
     ticks <- getTicks
     font <- P.loadFont platform (mediaDir </> "fonts" </> "stdfont.ttf") 15
     let
