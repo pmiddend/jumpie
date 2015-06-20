@@ -201,6 +201,7 @@ processGroundPlayerObject ias p = do
           _playerVelocity = newPlayerVelocity,
           _playerWalkSince = if newPlayerMode == Ground then p ^. playerWalkSince else Nothing
           }
+  when (newPlayerMode == Air) (gplaySound "jump")
   return (np,sensorLines)
 
 processAirPlayerObject :: (Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])

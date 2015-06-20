@@ -1,1 +1,2 @@
 sounds/landing.wav - This work is licensed under the Sampling+ License. Originally retrieved from http://freesound.org/people/nextmaking/sounds/86005/
+sounds/jump.wav - This work is licensed under the attribution License (http://creativecommons.org/licenses/by/3.0/). Originally retrieved from http://freesound.org/people/unfa/sounds/193438/ and made by unfa. It was not modified (except for the conversion from flac to wav)
