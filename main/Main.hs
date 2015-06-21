@@ -71,15 +71,15 @@ outerGameOver = any outerGameOver'
 main :: IO ()
 main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
     ticks <- gcurrentTicks
-    (player,sections) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
+    (player,sections,otherObjects) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
     let
       initialGameState = GameState {
           _gsPlayer = player
         , _gsSections = sections
-        , _gsTempSection = []
+        , _gsOtherObjects = otherObjects
         , _gsGameOver = False
         , _gsCameraPosition = V2 0 0
-        , _gsMaxDeadline = maximumOf (traverse . traverse . _ObjectPlatform . platDeadline) sections ^?! _Just
+        , _gsMaxDeadline = maximumOf (traverse . traverse . platDeadline) sections ^?! _Just
         }
     lastGameState <- execStateT stageMainLoop initialGameState
     _ <- execStateT gameoverMainLoop lastGameState

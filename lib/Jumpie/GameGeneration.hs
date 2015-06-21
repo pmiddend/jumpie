@@ -3,16 +3,17 @@
 module Jumpie.GameGeneration(
     generateGame
   , generateSection
-  , moveSection
+  {-, moveSection-}
   , sectionBeginEnd
-  , WorldSection
   ) where
 
+import           Jumpie.Platforms
 import           Jumpie.GameConfig      (gcPlatMaxLength,
                                          gcTileSize, screenHeight, screenWidth)
 import           Control.Monad.Writer.Strict       (runWriterT)
 import           Jumpie.GameObject
 import           Jumpie.Platform
+import           Jumpie.GeneratedSection
 import qualified Jumpie.LevelGeneration as LG
 import           Jumpie.Geometry.Rect
 import           Jumpie.Types
@@ -23,6 +24,10 @@ import Linear.V2
 import Wrench.Time
 import Control.Lens((^.),view)
 import Data.List(head,minimum,maximum)
+import           Jumpie.TileIncrement 
+import           Jumpie.MoveableObject 
+import           Jumpie.Player 
+import           Jumpie.PlayerMode
 
   {-
 initialPlayer :: Player
@@ -60,32 +65,31 @@ randomStar ticks xs = do
   return $ Star (p - V2 0 (fromIntegral (gcTileSize `div` 2))) ticks
 -}
 
-type WorldSection = [GameObject]
-
-generateSection :: MonadRandom m => TimeTicks -> [Platform] -> m WorldSection
+generateSection :: MonadRandom m => TimeTicks -> [Platform] -> m GeneratedSection
 generateSection timeTicks prevPlats = do
   let
     platsAction = LG.iterateNewPlatforms 1 (1,tilesPerScreen ^. _y) gcPlatMaxLength timeTicks prevPlats 
   (plats,_) <- runWriterT platsAction
+  return (GeneratedSection{ _secPlatforms = plats,_secObjects = [] })
+
+sectionBeginEnd :: [Platform] -> (TileIncrement,TileIncrement)
+sectionBeginEnd boxes =
   let
-    boxes = ObjectPlatform <$> plats
-  return boxes
+    minPos = minimum (view platLeft <$> boxes)
+    maxPos = maximum (view platRight <$> boxes)
+  in
+    (TileIncrement minPos,TileIncrement maxPos)
 
-sectionBeginEnd :: WorldSection -> (TileIncrement,TileIncrement)
-sectionBeginEnd objects =
-  let boxes = mapMaybe maybePlatform objects
-      minPos = minimum (view platLeft <$> boxes)
-      maxPos = maximum (view platRight <$> boxes)
-  in (TileIncrement minPos,TileIncrement maxPos)
-
+{-
 moveSection :: TileIncrement -> WorldSection -> WorldSection
 moveSection r s = (`moveObject` r) <$> s
+-}
 
-generateGame :: MonadRandom m => TimeTicks -> m (Player,[WorldSection])
+generateGame :: MonadRandom m => TimeTicks -> m (Player,[Platforms],[GameObject])
 generateGame currentTicks = do
   section <- generateSection currentTicks []
   let
-    firstBox = head (sortBy (comparing (view platLeft)) (mapMaybe maybePlatform section))
+    firstBox = head (sortBy (comparing (view platLeft)) (section ^. secPlatforms))
     rawPlayerPos = abovePlatPosition firstBox
     playerPos = rawPlayerPos + V2 (fromIntegral gcTileSize / 2) (fromIntegral (-gcTileSize))
   let player = Player {
@@ -94,4 +98,4 @@ generateGame currentTicks = do
         _playerVelocity = V2 0.0 0.0,
         _playerWalkSince = Nothing
       }
-  return (player,[section])
+  return (player,[section ^. secPlatforms],section ^. secObjects)

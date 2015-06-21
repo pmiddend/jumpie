@@ -3,15 +3,26 @@
 module Jumpie.Game(processGameObjects,testGameOver) where
 
 import           Data.Maybe                   (fromJust)
+import           Jumpie.ParticleType 
 import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
 import           Jumpie.GameConfig
 import Control.Lens.Fold(maximumOf,minimumOf)
 import           Jumpie.MonadGame
+import           Jumpie.GeneratedSection
+import           Jumpie.Platforms
+import           Jumpie.ParticleStaticData
+import           Jumpie.ParticleGravity
+import           Jumpie.Particle
+import           Jumpie.TileIncrement
 import           Jumpie.GameObject
+import           Jumpie.SensorLine
 import           Jumpie.Platform
+import           Jumpie.MoveableObject
 import           Jumpie.GameState
 import           Jumpie.GameGeneration
+import           Jumpie.Player
+import           Jumpie.PlayerMode
 import           Jumpie.Geometry.Intersection (rectLineSegmentIntersects)
 import           Jumpie.Geometry.LineSegment  (LineSegment (LineSegment))
 import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
@@ -22,7 +33,8 @@ import           Jumpie.Types                 (LineSegmentReal, PointReal, Real,
 import Jumpie.IncomingAction
 import ClassyPrelude hiding(Real,head,last)
 import Linear.V2(_x,_y,V2(..))
-import Control.Lens((^.),(^?!),_Just,use)
+import Linear.Vector((*^))
+import Control.Lens((^.),(^?!),_Just,use,(&),(+~),over,_1)
 import Wrench.Animation
 import Data.List(last)
 import Control.Lens((.=),(<>=),(%=))
@@ -41,32 +53,33 @@ updateCameraPosition cameraPos playerPos =
   in
     V2 x (cameraPos ^. _y)
 
-type LastWorldSection = WorldSection
+type LastWorldSection = Platforms
 
 shouldGenerateNewSection :: LastWorldSection -> Player -> Bool
 shouldGenerateNewSection lastSection player =
-  let maxBoxPosition = minimumOf (traverse . _ObjectPlatform . platLeftAbsReal) lastSection ^?! _Just
+  let maxBoxPosition = minimumOf (traverse . platLeftAbsReal) lastSection ^?! _Just
   in (abs ((player ^. playerPosition . _x) - maxBoxPosition)) < fromIntegral screenWidth
 
-generateNewSection :: (MonadRandom m,MonadGame m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => WorldSection -> m ()
+generateNewSection :: (MonadRandom m,MonadGame m,Monad m,MonadIO m,Applicative m,MonadState GameState m) => Platforms -> m ()
 generateNewSection lastSection = do
   putStrLn "Generating new section"
   maxDeadlinePrev <- use gsMaxDeadline
   --let lastSectionEnd = maximumOf (traverse . _ObjectPlatform . platRight) lastSection ^?! _Just
   --newSection <- moveSection (TileIncrement (lastSectionEnd+1)) <$> generateSection maxDeadlinePrev (mapMaybe maybePlatform lastSection)
-  newSection <- generateSection maxDeadlinePrev (mapMaybe maybePlatform lastSection)
-  gsMaxDeadline .= maximumOf (traverse . _ObjectPlatform . platDeadline) newSection ^?! _Just
-  gsSections <>= [newSection]
+  newSection <- generateSection maxDeadlinePrev lastSection
+  gsMaxDeadline .= maximumOf (traverse . platDeadline) (newSection ^. secPlatforms) ^?! _Just
+  gsSections <>= [newSection ^. secPlatforms]
+  gsOtherObjects <>= newSection ^. secObjects
 
 updateSectionsAndPlayer :: (MonadIO m,MonadGame m, MonadWriter [OutgoingAction] m, MonadState GameState m, Applicative m) => [IncomingAction] -> m ()
 updateSectionsAndPlayer actions = do
-  newSections <- traverse (processWorldSection actions) =<< use gsSections 
-  gsSections .= newSections
-  newTempSection <- processWorldSection actions =<< use gsTempSection 
-  gsTempSection .= newTempSection
+  newSectionsAndObjects <- traverse (processPlatforms actions) =<< use gsSections 
+  gsSections .= ((fromMaybe [] . fst) <$> newSectionsAndObjects)
+  newObjects <- traverse (processGameObject actions) =<< use gsOtherObjects 
+  gsOtherObjects .= (concatMap snd newSectionsAndObjects) <> (concatMap snd newObjects) <> (catMaybes (fst <$> newObjects))
   (newPlayer,playerObjects) <- processPlayerObject actions =<< use gsPlayer
-  gsTempSection <>= playerObjects
-  gsPlayer .= newPlayer
+  gsOtherObjects <>= playerObjects
+  gsPlayer .= fromJust newPlayer
 
 maybeGenerateNewSection :: (MonadRandom m,Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => m ()
 maybeGenerateNewSection = do
@@ -84,55 +97,82 @@ processGameObjects actions = do
     []:ss@(newFirstSection:_) -> do
       putStrLn "Moving sections"
       let (newFirstSectionStart,_) = sectionBeginEnd newFirstSection
-      tempSection <- use gsTempSection
+      tempSection <- use gsOtherObjects
       -- TODO: camera position only changes x value - better lens here
       gsPlayer %= (`moveObject` (-newFirstSectionStart))
       --gsPlayer . playerPosition . _x -= newFirstSectionStart
       player <- use gsPlayer
       cameraPosition <- use gsCameraPosition
       gsCameraPosition .= updateCameraPosition (V2 (cameraPosition ^. _x - (tileIncrementAbsReal newFirstSectionStart)) (cameraPosition ^. _y)) (player ^. playerPosition) 
-      gsTempSection .= moveSection (-newFirstSectionStart) tempSection
-      gsSections .= (moveSection (-newFirstSectionStart) <$> ss)
+      gsOtherObjects .= ((`moveObject` (-newFirstSectionStart)) <$> tempSection)
+      gsSections .= (((`moveObject` (-newFirstSectionStart)) <$> ) <$> ss)
     _ -> do
       player <- use gsPlayer
       cameraPosition <- use gsCameraPosition
       gsCameraPosition .= updateCameraPosition cameraPosition (player ^. playerPosition) 
-  
 
-processWorldSection :: (Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> WorldSection -> m WorldSection
-processWorldSection actions section = do
-  objects <- traverse (processGameObject actions) section
-  return (concat objects)
+type ObjectProcessor m a = [IncomingAction] -> a -> m (Maybe a,[GameObject])
 
-processGameObject :: (MonadIO m,Functor m,MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> GameObject -> m [GameObject]
-processGameObject _ o = case o of
+processPlatforms :: (Monad m,MonadIO m,Applicative m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => ObjectProcessor m Platforms
+processPlatforms actions section = do
+  platformsWithObjects <- traverse (processPlatform actions) section
+  let
+    platforms = catMaybes (fst <$> platformsWithObjects)
+    objects = concatMap snd platformsWithObjects
+  return (if null platforms then Nothing else Just platforms,objects)
+
+processGameObject :: (MonadIO m,Functor m,MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => ObjectProcessor m GameObject
+processGameObject actions o = case o of
   ObjectPlayer _ -> error "player given to processGameObject, check the code"
-  ObjectPlatform p -> do
-    ticks <- gcurrentTicks
-    anim <- glookupAnimUnsafe $ "platform" <> (pack (show (p ^. platLength))) <> "_crack"
-    if ticks > (p ^. platDeadline) `plusDuration` (anim ^. animLifetime)
-      then return []
-      else return [ObjectPlatform p]
-  ObjectParticle b -> processParticle b
-  ObjectSensorLine _ -> return []
+  ObjectPlatform _ -> error "You shouldn't process platforms indirectly"
+  ObjectParticle b -> do
+    (newParticle,objects) <- processParticle actions b
+    return (ObjectParticle <$> newParticle,objects)
+  ObjectSensorLine _ -> return (Nothing,[])
+
+processPlatform :: (MonadGame m, Functor m, Monad m) => ObjectProcessor m Platform
+processPlatform _ p = do
+  ticks <- gcurrentTicks
+  anim <- glookupAnimUnsafe $ "platform" <> (pack (show (p ^. platLength))) <> "_crack"
+  if ticks > (p ^. platDeadline) `plusDuration` (anim ^. animLifetime)
+    then return (Nothing,[ObjectParticle (Particle{ _particleType = ParticleTypeStatic (ParticleStaticData{ _psdSprite = "platform_rubble_earthy", _psdLifetime = fromSeconds 1}),_particlePosition = p ^. platLeftTopAbsReal,_particleVelocity = V2 0 0, _particleGravity = ParticleAffectedByGravity 1, _particleInception = ticks })])
+    else return (Just p,[])
 
 testGameOver :: MonadState GameState m => m Bool
 testGameOver = do
   player <- use gsPlayer
   return ((player ^. playerPosition ^. _y) > fromIntegral screenHeight)
 
-processParticle :: (Functor m,Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => Particle -> m [GameObject]
-processParticle b = do
-  currentTicks' <- gcurrentTicks
-  anim <- glookupAnimUnsafe (b ^. particleIdentifier)
-  if (b ^. particleInception) `plusDuration` (anim ^. animLifetime)  < currentTicks'
-    then return []
-    else return [ObjectParticle b]
+particleDeadline :: (MonadGame m, Functor m, Monad m) => Particle -> m TimeTicks
+particleDeadline particle = 
+  case particle ^. particleType of
+    ParticleTypeAnimated animId -> do
+      anim <- glookupAnimUnsafe animId
+      return $ (particle ^. particleInception) `plusDuration` (anim ^. animLifetime)
+    ParticleTypeStatic s -> do
+      return $ (particle ^. particleInception) `plusDuration` (s ^. psdLifetime)
 
-processPlayerObject :: (MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])
-processPlayerObject ias p = case p ^. playerMode of
-  Ground -> processGroundPlayerObject ias p
-  Air -> processAirPlayerObject ias p
+particleVelocityChange :: Particle -> PointReal
+particleVelocityChange particle =
+  case particle ^. particleGravity of
+    ParticleFloating -> V2 0 0
+    ParticleAffectedByGravity mass -> V2 0 (gcGrv / mass)
+
+processParticle :: (Functor m,Monad m,MonadGame m,MonadState GameState m) => ObjectProcessor m Particle
+processParticle _ b = do
+  currentTicks' <- gcurrentTicks
+  currentDelta <- gcurrentTimeDelta
+  deadline <- particleDeadline b
+  if deadline < currentTicks'
+    then return (Nothing,[])
+    else
+      return (Just (b & particlePosition +~ (toSeconds currentDelta) *^ (b ^. particleVelocity) & particleVelocity +~ (toSeconds currentDelta) *^ particleVelocityChange b),[])
+
+processPlayerObject :: (MonadGame m,Monad m,MonadState GameState m,MonadWriter [OutgoingAction] m) => ObjectProcessor m Player
+processPlayerObject ias p =
+  case p ^. playerMode of
+    Ground -> processGroundPlayerObject ias p
+    Air -> processAirPlayerObject ias p
 
 -- Testet, ob ein LineSegment (ein Sensor) mit der Umgebung kollidiert
 lineCollision :: [GameObject] -> LineSegmentReal -> Maybe GameObject
@@ -165,7 +205,7 @@ applySensors go p wSDev = Sensors wS fSL fSR cSL cSR wSCollision fSLCollision fS
         cSLCollision = lineCollision boxes cSL
         cSRCollision = lineCollision boxes cSR
 
-processGroundPlayerObject :: (Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])
+processGroundPlayerObject :: (Monad m,MonadGame m,MonadState GameState m) => ObjectProcessor m Player
 processGroundPlayerObject ias p = do
   t <- gcurrentTimeDelta
   objects <- use gsAllObjects
@@ -202,9 +242,9 @@ processGroundPlayerObject ias p = do
           _playerWalkSince = if newPlayerMode == Ground then p ^. playerWalkSince else Nothing
           }
   when (newPlayerMode == Air && PlayerJumpPressed `elem` ias) (gplaySound "jump")
-  return (np,sensorLines)
+  return (Just np,sensorLines)
 
-processAirPlayerObject :: (Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])
+processAirPlayerObject :: (Monad m,MonadGame m,MonadState GameState m) => ObjectProcessor m Player
 processAirPlayerObject ias p = do
   t <- gcurrentTimeDelta
   objects <- use gsAllObjects
@@ -233,7 +273,7 @@ processAirPlayerObject ias p = do
       _ -> Air
     dirt =
       if newPlayerMode == Ground
-      then [ObjectParticle (Particle "dirt" (p ^. playerPosition) currentTicks')]
+      then [ObjectParticle (Particle (ParticleTypeAnimated "dirt") (p ^. playerPosition) (V2 0 0) ParticleFloating currentTicks')]
       else []
     newPlayerPositionX = case sensors ^. sensWCollision of
       Just (ObjectPlatform r) -> if r ^. platRectAbsReal . center . _x < oldPlayerPositionX
@@ -268,4 +308,4 @@ processAirPlayerObject ias p = do
       _playerWalkSince = if newPlayerMode == Ground then Just currentTicks' else Nothing
       }
   when (newPlayerMode == Ground) (gplaySound "landing")
-  return (np,dirt <> sensorLines)
+  return (Just np,dirt <> sensorLines)

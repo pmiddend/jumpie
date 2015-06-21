@@ -29,6 +29,16 @@ library
                      , Jumpie.GameState
                      , Jumpie.Game
                      , Jumpie.GameConfig
+                     , Jumpie.Player
+                     , Jumpie.Particle
+                     , Jumpie.ParticleType
+                     , Jumpie.ParticleStaticData
+                     , Jumpie.PlayerMode
+                     , Jumpie.MoveableObject
+                     , Jumpie.ParticleGravity
+                     , Jumpie.SensorLine
+                     , Jumpie.TileIncrement
+                     , Jumpie.GeneratedSection
                      , Jumpie.IncomingAction
                      , Jumpie.GameObject
                      , Jumpie.GameGeneration

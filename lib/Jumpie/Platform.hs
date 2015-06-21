@@ -3,8 +3,10 @@ module Jumpie.Platform where
 
 import           Jumpie.Types
 import           Jumpie.GameConfig
+import           Jumpie.TileIncrement
+import           Jumpie.MoveableObject
 import           Jumpie.Geometry.Rect
-import Control.Lens(Getter,to,(^.))
+import Control.Lens(Getter,to,(^.),(&),(+~))
 import Control.Lens.TH(makeLenses)
 import ClassyPrelude hiding(Real)
 import Wrench.Time
@@ -40,3 +42,6 @@ platRectAbsReal = to helper
         rectRightBottom = rectLeftTop + ((fromIntegral . (*gcTileSize)) <$> V2 (p ^. platLength) 1)
       in
         Rect rectLeftTop rectRightBottom
+
+instance MoveableObject Platform where
+  moveObject p v = p & platLeft +~ tileIncrementRelative v

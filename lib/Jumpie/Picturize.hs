@@ -7,7 +7,13 @@ module Jumpie.Picturize(
 import           Data.Maybe                  (fromJust)
 import           Jumpie.GameConfig           (screenWidth,screenHeight)
 import           Jumpie.MonadGame
+import Jumpie.Particle
 import           Jumpie.GameObject
+import           Jumpie.ParticleStaticData
+import           Jumpie.ParticleType
+import           Jumpie.SensorLine
+import           Jumpie.PlayerMode
+import           Jumpie.Player
 import           Jumpie.GameState
 import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
 import Control.Lens((^.),(^?!),ix)
@@ -64,11 +70,15 @@ picturizePlatform p = do
       return (platTopLeft `pictureTranslated` pictureSpriteTopLeft image)
 
 picturizeParticle :: (Functor m,Monad m,MonadGame m) => Particle -> m Picture
-picturizeParticle (Particle identifier pos inception) = do
+picturizeParticle Particle{_particleType=t,_particlePosition=pos,_particleInception=inception} = do
   ticks <- gcurrentTicks
-  anim <- glookupAnimUnsafe identifier
-  let image = currentAnimFrame inception ticks anim
-  return (pos `pictureTranslated` pictureSpriteCentered image)
+  case t of
+    ParticleTypeAnimated animId -> do
+      anim <- glookupAnimUnsafe animId
+      let image = currentAnimFrame inception ticks anim
+      return (pos `pictureTranslated` pictureSpriteCentered image)
+    ParticleTypeStatic (ParticleStaticData{_psdSprite=identifier}) -> do
+      return (pos `pictureTranslated` pictureSpriteCentered identifier)
 
 picturizeLine :: (Applicative m,MonadGame m) => SensorLine -> m Picture
 picturizeLine (SensorLine s) = pure (pictureLine (s ^. lineSegmentFrom) (s ^. lineSegmentTo))

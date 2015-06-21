@@ -8,3 +8,5 @@ platform4=0,72,140,106
 platform5=0,108,174,142
 platform6=0,144,209,179
 platform7=0,180,244,214
+platform_rubble_earthy=0,216,16,232
+platform_rubble_grassy=18,216,33,229
