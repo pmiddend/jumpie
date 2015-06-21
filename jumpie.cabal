@@ -29,6 +29,7 @@ library
                      , Jumpie.GameState
                      , Jumpie.Game
                      , Jumpie.GameConfig
+                     , Jumpie.IncomingAction
                      , Jumpie.GameObject
                      , Jumpie.GameGeneration
                      , Jumpie.Picturize

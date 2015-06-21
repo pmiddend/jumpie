@@ -1,6 +1,5 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 module Jumpie.Types (
-    IncomingAction(..),
     OutgoingAction(..),
     PointReal,
     RectReal,
@@ -32,10 +31,5 @@ data OutgoingAction = StarCollected
 
 isStarCollected :: OutgoingAction -> Bool
 isStarCollected StarCollected = True
-
-data IncomingAction = PlayerLeft
-                    | PlayerRight
-                    | PlayerJump
-  deriving Eq
 
 type Keydowns = Set Keysym

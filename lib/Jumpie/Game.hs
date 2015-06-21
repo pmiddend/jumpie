@@ -18,8 +18,8 @@ import           Jumpie.Geometry.Rect         (bottom, center, left, right, top)
 import           Jumpie.Geometry.Utility      (clampAbs)
 import Jumpie.Sensors
 import           Jumpie.Maybe                 (ifMaybe)
-import           Jumpie.Types                 (IncomingAction (..),
-                                               LineSegmentReal, PointReal, Real,OutgoingAction(..))
+import           Jumpie.Types                 (LineSegmentReal, PointReal, Real,OutgoingAction(..))
+import Jumpie.IncomingAction
 import ClassyPrelude hiding(Real,head,last)
 import Linear.V2(_x,_y,V2(..))
 import Control.Lens((^.),(^?!),_Just,use)
@@ -172,7 +172,7 @@ processGroundPlayerObject ias p = do
   let   sensorLines = map (ObjectSensorLine . SensorLine) [sensors ^. sensW,sensors ^. sensFL,sensors ^. sensFR,sensors ^. sensCL,sensors ^. sensCR]
         sensors = applySensors objects (p ^. playerPosition) 4.0
         fCollision = (sensors ^. sensFLCollision) <|> (sensors ^. sensFRCollision)
-        newPlayerMode = if isNothing fCollision || PlayerJump `elem` ias
+        newPlayerMode = if isNothing fCollision || PlayerJumpPressed `elem` ias
                         then Air
                         else Ground
         newPlayerPositionX = case sensors ^. sensWCollision of
@@ -183,7 +183,7 @@ processGroundPlayerObject ias p = do
         newPlayerPositionY = case fCollision of
           Just (ObjectPlatform r) -> r ^. platRectAbsReal . top - gcPlayerHeight
           _ -> p ^. playerPosition . _y
-        newPlayerVelocityY = if PlayerJump `elem` ias then gcJmp else 0.0
+        newPlayerVelocityY = if PlayerJumpPressed `elem` ias then gcJmp else 0.0
         oldPlayerVelocityX = p ^. playerVelocity ^. _x
         playerAcc
           | PlayerLeft `elem` ias = Just $ if oldPlayerVelocityX > 0.0 then -gcDec else (-gcAcc)
@@ -201,7 +201,7 @@ processGroundPlayerObject ias p = do
           _playerVelocity = newPlayerVelocity,
           _playerWalkSince = if newPlayerMode == Ground then p ^. playerWalkSince else Nothing
           }
-  when (newPlayerMode == Air && PlayerJump `elem` ias) (gplaySound "jump")
+  when (newPlayerMode == Air && PlayerJumpPressed `elem` ias) (gplaySound "jump")
   return (np,sensorLines)
 
 processAirPlayerObject :: (Monad m,MonadGame m,MonadState GameState m,MonadWriter [OutgoingAction] m) => [IncomingAction] -> Player -> m (Player,[GameObject])
@@ -256,7 +256,7 @@ processAirPlayerObject ias p = do
                            Nothing -> airDrag oldPlayerVelocityX
     newPlayerVelocityY
       | oldPlayerVelocityY < 0.0 && isJust cCollision && playerIsAboveBox (fromJust cCollision) = toSeconds t * gcGrv
-      | oldPlayerVelocityY < (-4.0) && (PlayerJump `onotElem` ias) = -4.0
+      | oldPlayerVelocityY < (-4.0) && (PlayerJumpHeld `onotElem` ias) = -4.0
       | otherwise = oldPlayerVelocityY + toSeconds t * gcGrv
     airDrag xv = if newPlayerVelocityY < 0.0 && newPlayerVelocityY > -4.0 && abs xv >= 0.125
                  then xv * 0.9685

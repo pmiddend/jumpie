@@ -8,11 +8,12 @@ import           Jumpie.Game
 import           Jumpie.GameGeneration
 import Jumpie.GameState
 import Jumpie.GameObject
+import Jumpie.IncomingAction
 import Jumpie.Platform
 import Jumpie.MonadGame
-import Jumpie.Types
 import qualified Wrench.Keysym as KS
 import Wrench.Event
+import Wrench.KeyMovement
 import Wrench.Time
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
@@ -40,12 +41,16 @@ stageMainLoop = do
   gameOverBefore <- use gsGameOver
   unless (outerGameOver events || gameOverBefore) $ do
     kds <- gcurrentKeydowns
-    let incomingActions = concatMap kdToAction kds
+    let incomingActions = concatMap kdToAction kds <> concatMap keyEventToAction events
     _ <- runWriterT (processGameObjects incomingActions)
     go <- testGameOver
     gsGameOver .= go
     grender =<< picturizeGameState =<< get
     stageMainLoop
+
+keyEventToAction :: Event -> [IncomingAction]
+keyEventToAction (Keyboard KeyDown _ KS.Up) = [PlayerJumpPressed]
+keyEventToAction _ = []
 
 kdToAction :: KS.Keysym -> [IncomingAction]
 kdToAction sc = fromMaybe [] $
@@ -53,7 +58,8 @@ kdToAction sc = fromMaybe [] $
         sc
         [ (KS.Left, [PlayerLeft])
         , (KS.Right, [PlayerRight])
-        , (KS.Up, [PlayerJump])]
+        , (KS.Up, [PlayerJumpHeld])
+        ]
 
 -- Vorfilterung der Events, ob das Spiel beendet werden soll
 outerGameOver :: [Event] -> Bool
