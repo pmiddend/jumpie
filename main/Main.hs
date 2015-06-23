@@ -10,7 +10,7 @@ import Jumpie.GameState
 import Jumpie.GameObject
 import Jumpie.IncomingAction
 import Jumpie.Platform
-import Jumpie.MonadGame
+import Wrench.MonadGame
 import qualified Wrench.Keysym as KS
 import Wrench.Event
 import Wrench.KeyMovement
@@ -36,7 +36,7 @@ gameoverMainLoop = do
 stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,MonadGame m,MonadState GameState m) => m ()
 stageMainLoop = do
   events <- gpollEvents
-  gupdateTicks
+  gupdateTicks gcTimeMultiplier
   gupdateKeydowns events
   gameOverBefore <- use gsGameOver
   unless (outerGameOver events || gameOverBefore) $ do
@@ -69,7 +69,7 @@ outerGameOver = any outerGameOver'
           outerGameOver' _ = False
 
 main :: IO ()
-main = runGame "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
+main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
     ticks <- gcurrentTicks
     (player,sections,otherObjects) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
     let

@@ -8,7 +8,7 @@ import           Data.Monoid                  (First (First), getFirst)
 import Wrench.Time
 import           Jumpie.GameConfig
 import Control.Lens.Fold(maximumOf,minimumOf)
-import           Jumpie.MonadGame
+import           Wrench.MonadGame
 import           Jumpie.GeneratedSection
 import           Jumpie.Platforms
 import           Jumpie.ParticleStaticData

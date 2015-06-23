@@ -6,7 +6,7 @@ module Jumpie.Picturize(
 
 import           Data.Maybe                  (fromJust)
 import           Jumpie.GameConfig           (screenWidth,screenHeight)
-import           Jumpie.MonadGame
+import           Wrench.MonadGame
 import Jumpie.Particle
 import           Jumpie.GameObject
 import           Jumpie.ParticleStaticData
