@@ -49,7 +49,7 @@ stageMainLoop = do
     stageMainLoop
 
 keyEventToAction :: Event -> [IncomingAction]
-keyEventToAction (Keyboard KeyDown _ KS.Up) = [PlayerJumpPressed]
+keyEventToAction (Keyboard (KeyboardEvent{_keyMovement=KeyDown,_keySym=KS.Up})) = [PlayerJumpPressed]
 keyEventToAction _ = []
 
 kdToAction :: KS.Keysym -> [IncomingAction]
@@ -65,7 +65,7 @@ kdToAction sc = fromMaybe [] $
 outerGameOver :: [Event] -> Bool
 outerGameOver = any outerGameOver'
     where outerGameOver' Quit = True
-          outerGameOver' (Keyboard _ _ KS.Escape) = True
+          outerGameOver' (Keyboard (KeyboardEvent{_keySym=KS.Escape})) = True
           outerGameOver' _ = False
 
 main :: IO ()
