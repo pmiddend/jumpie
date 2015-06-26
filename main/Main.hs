@@ -69,7 +69,7 @@ outerGameOver = any outerGameOver'
           outerGameOver' _ = False
 
 main :: IO ()
-main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) $ do
+main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) Nothing $ do
     ticks <- gcurrentTicks
     (player,sections,otherObjects) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
     let
