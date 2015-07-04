@@ -13,6 +13,7 @@ import Jumpie.Platform
 import Wrench.MonadGame
 import qualified Wrench.Keysym as KS
 import Wrench.Event
+import Wrench.RenderBlockMode
 import Wrench.KeyMovement
 import Wrench.Time
 import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
@@ -69,7 +70,7 @@ outerGameOver = any outerGameOver'
           outerGameOver' _ = False
 
 main :: IO ()
-main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) Nothing $ do
+main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) Nothing (RenderAndWait 60) $ do
     ticks <- gcurrentTicks
     (player,sections,otherObjects) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
     let
