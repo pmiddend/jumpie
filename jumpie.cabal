@@ -29,6 +29,7 @@ library
                      , Jumpie.Game
                      , Jumpie.GameConfig
                      , Jumpie.Player
+                     , Jumpie.UnitType
                      , Jumpie.Particle
                      , Jumpie.ParticleType
                      , Jumpie.ParticleStaticData

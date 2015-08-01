@@ -6,17 +6,17 @@ import           Jumpie.Picturize          (picturizeGameState)
 import Jumpie.GameConfig
 import           Jumpie.Game
 import           Jumpie.GameGeneration
+import Wrench.MouseGrabMode
+import Wrench.RenderBlockMode
+import Wrench.WindowSize
 import Jumpie.GameState
-import Jumpie.GameObject
 import Jumpie.IncomingAction
 import Jumpie.Platform
 import Wrench.MonadGame
 import qualified Wrench.Keysym as KS
 import Wrench.Event
-import Wrench.RenderBlockMode
 import Wrench.KeyMovement
 import Wrench.Time
-import Wrench.Platform hiding(renderFinish,pollEvents,renderBegin)
 import ClassyPrelude
 import Control.Lens((.=),use,(^?!),_Just)
 import Control.Lens.Fold(maximumOf)
@@ -24,6 +24,11 @@ import Linear.V2
 import Control.Monad.Random       (MonadRandom)
 import Control.Monad.State.Strict(get,MonadState,execStateT)
 import Control.Monad.Writer(runWriterT)
+import Wrench.Picture
+import Jumpie.UnitType
+
+discretizePicture :: Picture UnitType UnitType -> Picture Int UnitType
+discretizePicture = first floor
 
 gameoverMainLoop :: (Monad m,Applicative m,MonadState GameState m,MonadGame m) => m ()
 gameoverMainLoop = do
@@ -31,7 +36,7 @@ gameoverMainLoop = do
     gupdateKeydowns events
     unless (outerGameOver events) $
         do 
-          grender =<< picturizeGameState =<< get
+          (grender . discretizePicture) =<< picturizeGameState =<< get
           gameoverMainLoop
 
 stageMainLoop :: (MonadIO m,Monad m,MonadRandom m,Applicative m,MonadGame m,MonadState GameState m) => m ()
@@ -46,7 +51,7 @@ stageMainLoop = do
     _ <- runWriterT (processGameObjects incomingActions)
     go <- testGameOver
     gsGameOver .= go
-    grender =<< picturizeGameState =<< get
+    grender . discretizePicture =<< picturizeGameState =<< get
     stageMainLoop
 
 keyEventToAction :: Event -> [IncomingAction]
@@ -70,7 +75,7 @@ outerGameOver = any outerGameOver'
           outerGameOver' _ = False
 
 main :: IO ()
-main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) Nothing (RenderAndWait 60) $ do
+main = runGame "media" "jumpie 0.1" (ConstantWindowSize screenWidth screenHeight) MouseGrabNo Nothing (RenderAndWait 60) $ do
     ticks <- gcurrentTicks
     (player,sections,otherObjects) <- generateGame (ticks `plusDuration` gcFirstPlatformWait)
     let

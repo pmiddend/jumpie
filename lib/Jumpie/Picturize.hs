@@ -4,28 +4,26 @@ module Jumpie.Picturize(
   picturizeGameState
   ) where
 
-import           Data.Maybe                  (fromJust)
-import           Jumpie.GameConfig           (screenWidth,screenHeight)
-import           Wrench.MonadGame
-import Jumpie.Particle
+import           ClassyPrelude
+import           Control.Lens              (ix, (^.), (^?!))
+import           Data.Maybe                (fromJust)
+import           Jumpie.GameConfig         (screenHeight, screenWidth)
 import           Jumpie.GameObject
+import           Jumpie.GameState
+import           Jumpie.Particle
 import           Jumpie.ParticleStaticData
 import           Jumpie.ParticleType
-import           Jumpie.SensorLine
-import           Jumpie.PlayerMode
+import           Jumpie.Platform
 import           Jumpie.Player
-import           Jumpie.GameState
-import           Jumpie.Geometry.LineSegment (lineSegmentFrom,lineSegmentTo)
-import Control.Lens((^.),(^?!),ix)
-import Wrench.ImageData
-import Jumpie.Platform
-import Wrench.SpriteIdentifier
-import Wrench.Animation
-import Wrench.Time
-import Wrench.Picture
-import ClassyPrelude
-import Linear.V2
-import Wrench.RenderPositionMode
+import           Jumpie.PlayerMode
+import           Jumpie.UnitType
+import           Linear.V2
+import           Wrench.Animation
+import           Wrench.MonadGame
+import           Wrench.Picture
+import           Wrench.RenderPositionMode
+import           Wrench.SpriteIdentifier
+import           Wrench.Time
 
 {-
 platToBoxes :: [PointInt] -> Platform -> [Box]
@@ -42,21 +40,21 @@ platToBoxes plats (Platform (V2 l y) (V2 r _) deadline) = map toBox [l..r]
 -}
 
 
-picturizeGameState :: (Monad m,Applicative m,MonadGame m) => GameState -> m Picture
+picturizeGameState :: (Monad m,Applicative m,MonadGame m) => GameState -> m (Picture UnitType UnitType)
 picturizeGameState gs = do
   picturizedObjects <- traverse picturizeObject (gs ^. gsAllObjects)
   let
     backgroundPicture = pictureSpriteResampled "background" RenderPositionTopLeft (V2 (fromIntegral screenWidth) (fromIntegral screenHeight))
   return (backgroundPicture <> (-(gs ^. gsCameraPosition)) `pictureTranslated` pictures picturizedObjects)
 
-picturizeObject :: (Monad m,Applicative m,MonadGame m) => GameObject -> m Picture
+picturizeObject :: (Monad m,Applicative m,MonadGame m) => GameObject -> m (Picture UnitType UnitType)
 picturizeObject ob = case ob of
   ObjectPlayer p -> picturizePlayer p
-  ObjectSensorLine s -> picturizeLine s
+--  ObjectSensorLine s -> picturizeLine s
   ObjectPlatform b -> picturizePlatform b
   ObjectParticle s -> picturizeParticle s
 
-picturizePlatform :: (MonadGame m,Monad m,Functor m) => Platform -> m Picture
+picturizePlatform :: (MonadGame m,Monad m,Functor m) => Platform -> m (Picture UnitType UnitType)
 picturizePlatform p = do
   ticks <- gcurrentTicks
   let
@@ -69,7 +67,7 @@ picturizePlatform p = do
       let image = currentAnimFrame (p ^. platDeadline) ticks anim
       return (platTopLeft `pictureTranslated` pictureSpriteTopLeft image)
 
-picturizeParticle :: (Functor m,Monad m,MonadGame m) => Particle -> m Picture
+picturizeParticle :: (Functor m,Monad m,MonadGame m) => Particle -> m (Picture UnitType UnitType)
 picturizeParticle Particle{_particleType=t,_particlePosition=pos,_particleInception=inception} = do
   ticks <- gcurrentTicks
   case t of
@@ -80,8 +78,8 @@ picturizeParticle Particle{_particleType=t,_particlePosition=pos,_particleIncept
     ParticleTypeStatic (ParticleStaticData{_psdSprite=identifier}) -> do
       return (pos `pictureTranslated` pictureSpriteCentered identifier)
 
-picturizeLine :: (Applicative m,MonadGame m) => SensorLine -> m Picture
-picturizeLine (SensorLine s) = pure (pictureLine (s ^. lineSegmentFrom) (s ^. lineSegmentTo))
+--picturizeLine :: (Applicative m,MonadGame m) => SensorLine -> m (Picture UnitType UnitType)
+--picturizeLine (SensorLine s) = pure (pictureLine (s ^. lineSegmentFrom) (s ^. lineSegmentTo))
 
 currentAnimFrame :: TimeTicks -> TimeTicks -> Animation -> SpriteIdentifier
 currentAnimFrame animStart currentTicks' anim =
@@ -92,7 +90,7 @@ currentAnimFrame animStart currentTicks' anim =
   in
     anim ^. animFrames ^?! ix animIndex
 
-picturizePlayer :: (Functor m,Monad m,MonadGame m) => Player -> m Picture
+picturizePlayer :: (Functor m,Monad m,MonadGame m) => Player -> m (Picture UnitType UnitType)
 picturizePlayer p = do
   ticks <- gcurrentTicks
   let
@@ -100,7 +98,7 @@ picturizePlayer p = do
     playerStands = abs (p ^. playerVelocity ^. _x) <= 0.01
     playerDirection = if p ^. playerVelocity ^. _x <= 0.0 then "left" else "right"
   playerWalkAnim <- glookupAnimUnsafe ("player_walk_" <> playerDirection)
-  let 
+  let
     playerImage :: Text
     playerImage
       | p ^. playerMode == Air = "player_fly_" <> playerDirection
